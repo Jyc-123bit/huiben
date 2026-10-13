@@ -62,6 +62,29 @@ https://你的用户名.github.io/huiben/
 
 ## 方法二：命令行（如果你电脑装了 git）
 
+### 2A. 一键脚本（推荐，Windows / Mac 都有）
+
+本文件夹里有现成脚本，双击即可：
+
+- Windows：双击 **`上传到GitHub.bat`**
+- Mac：双击 **`上传到GitHub.command`**
+
+脚本会提示你粘贴一个 GitHub Token，然后自动上传。
+
+**怎么弄一个 Token（只需 1 分钟）：**
+
+1. 打开 https://github.com/settings/tokens
+2. 点 **Generate new token** → **Generate new token (classic)**
+3. **Note** 随便填，比如 `huiben`
+4. **Expiration** 选 30 天或 90 天
+5. 勾选权限：**`repo`**（第一个大项，打钩即可）
+6. 拉到底点 **Generate token**，复制那串 `github_pat_...`
+7. 粘到脚本里回车
+
+> ⚠️ Token 相当于密码，不要发给别人。用完后建议到同一页面点 **Delete** 撤销。
+
+### 2B. 手动命令
+
 在本文件夹里打开终端，依次执行（把 `你的用户名` 换成实际用户名）：
 
 ```bash
