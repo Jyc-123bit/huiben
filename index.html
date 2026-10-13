@@ -207,6 +207,12 @@
   }
   .voice-sel:focus{border-color:var(--accent);}
   .voice-sel optgroup{font-weight:700;color:var(--ink-soft);}
+  .vg{display:inline-block;font-size:12px;padding:1px 7px;border-radius:999px;margin-left:4px;vertical-align:middle;}
+  .vg.v-best{background:#e8f7ee;color:#1f7a45;border:1px solid #bfe6cf;}
+  .vg.v-good{background:#eef6ff;color:#1f5c99;border:1px solid #c3ddf7;}
+  .vg.v-ok{background:#f4f4f5;color:#555;border:1px solid #ddd;}
+  .vg.v-meh{background:#fff8ec;color:#9a6b1f;border:1px solid #f0dfba;}
+  .vg.v-bad{background:#fdeeee;color:#a33;border:1px solid #f0c6c6;}
 
   /* Edge 提示 */
   .edge-tip{
@@ -578,6 +584,82 @@
 
   function hasHan(s){ return /[\u4e00-\u9fff\u3400-\u4dbf]/.test(s); }
 
+  /* ===== 形近字上下文纠错 =====
+     OCR 常把笔画相近的字看错，且多发生在固定词/搭配里。
+     这里用「上下文短语 → 修正」的方式做零风险替换：
+     只有整句里出现该短语（含错字的那个形式）才替换，不会误伤其它同形字。 */
+  var NEAR_CONFUSION = [
+    // [错误形式, 正确形式]
+    // 「兔」被认成「免」（少了最后一点）——绘本最高频的错
+    [/小免/g, '小兔'],
+    [/免子/g, '兔子'],
+    [/白免/g, '白兔'],
+    [/灰免/g, '灰兔'],
+    [/黑免/g, '黑兔'],
+    [/野免/g, '野兔'],
+    [/免儿/g, '兔儿'],
+    [/免宝宝/g, '兔宝宝'],
+    [/一对长耳朵的免/g, '一对长耳朵的兔'],
+    // 「日」被认成「曰」
+    [/生曰/g, '生日'],
+    [/今曰/g, '今日'],
+    [/明曰/g, '明日'],
+    [/昨曰/g, '昨日'],
+    [/曰子/g, '日子'],
+    [/曰本/g, '日本'],
+    [/每曰/g, '每日'],
+    [/白日/g, '白日'],
+    // 「已 / 己 / 巳」
+    [/自已/g, '自己'],
+    [/不能自已/g, '不能自已'],
+    [/己经/g, '已经'],
+    // 「未 / 末」
+    [/周未/g, '周末'],
+    [/期未/g, '期末'],
+    // 「人 / 入」
+    [/入口/g, '入口'],
+    [/大入/g, '大人'],
+    [/小入/g, '小人'],
+    // 「士 / 土」
+    [/战土/g, '战士'],
+    [/烈土/g, '烈士'],
+    // 「干 / 千」
+    [/一千二净/g, '一干二净'],
+    // 「侯 / 候」
+    [/时侯/g, '时候'],
+    [/气侯/g, '气候'],
+    // 「只 / 支 / 枝」
+    [/一朵小红化/g, '一朵小红花'],
+    [/小白化/g, '小白花'],
+    [/开化/g, '开花'],
+    // 「木 / 术」
+    [/树术/g, '树木'],
+    // 「水 / 永」
+    [/水果/g, '水果'],
+    // 「鸟 / 乌」
+    [/乌儿/g, '鸟儿'],
+    [/飞来飞去的乌/g, '飞来飞去的鸟'],
+    // 「贝 / 见」
+    [/再贝/g, '再见'],
+    // 「子 / 了」
+    [/完了/g, '完了'],
+    // 「在 / 再」
+    [/现再/g, '现在'],
+    // 「坐 / 座」
+    [/一座下/g, '一坐下'],
+    // 「那 / 哪」
+    [/哪里/g, '那里'],
+    [/哪么/g, '那么'],
+    // 「他 / 她 / 它」在绘本里常混，但不纠正（语义上没错）
+  ];
+
+  function fixNearConfusion(s){
+    for(var i = 0; i < NEAR_CONFUSION.length; i++){
+      s = s.replace(NEAR_CONFUSION[i][0], NEAR_CONFUSION[i][1]);
+    }
+    return s;
+  }
+
   // 判断一个 token 是否像拼音
   function looksLikePinyin(word){
     // 孤立单字母：a / A（英文冠词，保留）；其余单个小写字母（o e 等）当作噪声丢弃
@@ -606,9 +688,19 @@
     s = s.replace(/[ˇˊˋ˙]/g, '');
 
     // ③ 先判断整行是不是「拼音行」（整行由拼音音节 + 空格组成）
-    var noSpace = s.replace(/\s/g, '');
-    if(/^[a-zA-ZüĀ-ǜ\s]+$/.test(s) && noSpace.length > 1 && isPinyinSequence(noSpace)){
-      return '';   // 整行拼音 → 整行丢弃
+    //    用显式的带调元音字符类（最可靠，避免 Unicode 区间遗漏）
+    var TONE_SRC = 'āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜüĀÁǍÀĒÉĚÈĪÍǏÌŌÓǑÒŪÚǓÙǕǗǙǛÜ';
+    if(new RegExp('^[a-zA-Z' + TONE_SRC + '\\s]+$').test(s)){
+      var toks = s.trim().split(/\s+/).filter(Boolean);
+      // 只要出现任何一个常见英文词 → 不是拼音行，放行
+      var anyEN = toks.some(function(w){ return looksLikeEnglishWord(w); });
+      // 所有词都能切成拼音音节 → 视为拼音行
+      var allPy = toks.length > 0 && toks.every(function(w){ return isPinyinSequence(w); });
+      // 带声调的行：出现 2 个以上带调元音就基本可断定是拼音（英文不会有声调）
+      var toneCount = (s.match(new RegExp('[' + TONE_SRC + ']', 'g')) || []).length;
+      if(allPy && !anyEN) return '';                       // 整行拼音 → 整行丢弃
+      // 带调拼音行：连 you/hi/me 这类"英文拼音双关词"也一起丢弃
+      if(toneCount >= 2) return '';
     }
 
     var parts = s.split(/(\s+)/);
@@ -654,6 +746,112 @@
     });
   }
 
+  /* ===== 清除「乱入的字母 / 数字」=====
+     OCR 偶尔会在汉字中间冒出孤立的拉丁字母或数字残片（噪声），例如：
+      "小兔子找朋友a"、"他看见b一朵花"、"草地上3"、"开/bve一史"
+     判断原则：
+       - 真正的英文单词/句子：字母连续 >=2 且能构成合理英文词，保留
+       - 被汉字夹住的孤立字母 / 字母残片：删除
+       - 被汉字夹住的孤立数字：删除（绘本正文里极少有数字）
+     纯数字行 / 页码已在 isNoiseLine 处理。 */
+
+  // 是不是一个「像真的英文单词」的片段
+  // 注意：不能仅靠 looksLikePinyin 反推（很多英文词恰好能被切成拼音音节，如 have→ha+ve）
+  var EN_COMMON = {};
+  ('i a an the and or but so is are was were be am been being do does did done have has had ' +
+   'he she it we you they them his her its our their my your me us him this that these those ' +
+   'here there where when what who why how which while with without for from into onto over under ' +
+   'at in on of to by as up down out off again more most very too also just only even still ' +
+   'can could will would shall should may might must not no yes ok okay ' +
+   'come came go went get got give gave take took make made see saw look looked say said tell told ' +
+   'know knew think thought want wanted like liked love loved need needed help helped find found ' +
+   'play played run ran jump jumped walk walked sit sat stand stood eat ate drink drank sleep slept ' +
+   'read write draw sing dance swim fly flew smile laugh cry happy sad big small little good bad nice ' +
+   'red blue green yellow black white pink brown orange purple one two three four five six seven eight ' +
+   'nine ten sun moon star sky tree flower grass water fire rain snow wind cloud bird fish cat dog ' +
+   'rabbit bear duck pig cow horse sheep monkey tiger lion apple banana milk cake rice bread book ball ' +
+   'toy home school park mother father mom dad mum baby boy girl friend teacher doctor day night morning ' +
+   'hello hi bye goodbye please thank thanks sorry wow oh ah ha name game time life fun cute pretty').split(' ').forEach(function(w){
+    if(w) EN_COMMON[w] = true;
+  });
+
+  function looksLikeEnglishWord(w){
+    if(!/^[A-Za-z]+$/.test(w)) return false;
+    var lw = w.toLowerCase();
+    if(lw.length === 1) return /^[aAIi]$/.test(w);   // 仅 a/A/I/i 算词
+    if(EN_COMMON[lw]) return true;                    // 常见英文词直接认可
+    if(lw.length < 2) return false;
+    // 常见英文构词特征 → 认为是英文
+    if(/(ing|tion|sion|ous|ful|less|ness|ment|able|ible|ight|ould|augh|ough|ture|cious|tious)$/.test(lw)) return true;
+    if(/(er|ed|ly|est|y)$/.test(lw) && /[aeiou]/.test(lw)) return true;
+    // 含「拼音里不可能出现」的辅音簇 → 英文
+    if(/(bl|br|cl|cr|dr|fl|fr|gl|gr|pl|pr|scr|sk|sl|sm|sn|sw|tr|tw|ck|ff|ll|mm|nn|pp|rr|ss|tt|zz|ph|gh|wr|kn|wh|th)/.test(lw)) return true;
+    // 长度 ≥4 且以辅音结尾的，拼音极少这样收尾（world / friend / hand / milk）
+    if(lw.length >= 4 && /[bcdfghjklmnpqrstvwxz]$/.test(lw)) return true;
+    // 其它：能被切成合法拼音音节 → 大概率是拼音碎片，不算英文
+    if(looksLikePinyin(lw)) return false;
+    // 剩下有连续元音组合的，倾向认为是英文
+    return /[aeiou]{2}|[aeiou][bcdfghjklmnpqrstvwxz]e$/.test(lw);
+  }
+
+  // 删除「被汉字/标点包围的」孤立字母、字母碎片和孤立数字
+  function stripInjectedNoise(s){
+    var HAN = '\\u4e00-\\u9fff\\u3400-\\u4dbf';
+    var PUNCT = '，。！？、；：“”‘’《》—…（）,.!?;:';
+
+    // ① 汉字 + 1~4个字母 + 汉字/标点/行尾 → 若这串字母不是真英文词，删掉
+    s = s.replace(new RegExp('([' + HAN + '])([A-Za-z]{1,4})(?=[' + HAN + PUNCT + ']|$)', 'g'),
+      function(m, han, lat){
+        if(looksLikeEnglishWord(lat)) return m;
+        // 是拼音碎片 / 无意义字母 → 删除字母
+        return han;
+      });
+
+    // ② 行首 1~4个字母 + 汉字（中间无空格）→ 几乎是噪声（英文词会带空格）
+    //    只有 ≥2 个字母且像英文词才保留
+    s = s.replace(new RegExp('^([A-Za-z]{1,4})([' + HAN + '])', 'g'),
+      function(m, lat, han){
+        if(lat.length >= 2 && looksLikeEnglishWord(lat)) return m;
+        return han;
+      });
+
+    // ③ 汉字 + 数字 + 汉字/标点（被夹住的孤立数字）→ 删掉数字
+    //    注意排除「第3页」「一共3个」这类有意义编号 → 只在数字前后都是汉字时删
+    s = s.replace(new RegExp('([' + HAN + '])(\\d{1,3})(?=[' + HAN + PUNCT + ']|$)', 'g'),
+      function(m, han, num, off, whole){
+        // 若前面是「第/共/有/了/数」等量词，保留数字
+        var pre = whole.substring(Math.max(0, off - 1), off + 1);
+        if(/[第共有个只条朵页年月日时分秒]/.test(pre.charAt(0))) return m;
+        return han;
+      });
+
+    // ④ 独立的字母碎片混在汉字串里（如 "开/bve一史" 里的斜杠碎片）
+    s = s.replace(new RegExp('([' + HAN + '])\\s*[/\\\\|]\\s*[A-Za-z]{1,6}\\s*(?=[' + HAN + ']|$)', 'g'), '$1');
+
+    return s;
+  }
+
+  // 整行「拉丁字符占比过高」且不像英文句子 → 判为噪声行
+  function isMostlyLatinNoise(line){
+    var raw = line.trim();
+    if(!raw) return false;
+    var compact = raw.replace(/\s/g, '');
+    var hanCount = (compact.match(/[\u4e00-\u9fff\u3400-\u4dbf]/g) || []).length;
+    var latCount = (compact.match(/[A-Za-z]/g) || []).length;
+    if(hanCount === 0 && latCount === 0) return false;
+    // 完全没有汉字，全拉丁 → 只有"像英文句子"才留
+    if(hanCount === 0){
+      // 用「按空格分出的词」判断（不能先去空格，否则词会连成一片）
+      var words = raw.split(/[^A-Za-z]+/).filter(Boolean);
+      // 单词数很少时，也尝试把长串按常见词切开：只要整串本身像英文词也算
+      if(words.length === 1 && looksLikeEnglishWord(words[0])) return false;
+      var good = words.filter(looksLikeEnglishWord).length;
+      return good < 2;   // 少于2个真英文词 → 噪声
+    }
+    // 有汉字，但拉丁字母明显多于汉字 → 多半是噪声行
+    if(latCount > 0 && latCount >= hanCount + 3) return true;
+    return false;
+  }
   // 一行里出现「标题 + 正文粘连」→ 在重复处切开
   // 例："小兔子找朋友小兔子蹦蹦跳跳地来到草地上。" → ["小兔子找朋友", "小兔子蹦蹦跳跳地来到草地上。"]
   function splitGluedTitle(s){
@@ -693,6 +891,9 @@
     // ④ "第X页 共Y页"
     if(/^第\s*\d+\s*页\s*[\/共]?\s*第?\s*\d*\s*页?$/.test(t)) return true;
 
+    // ⑤ 整行基本是拉丁字母噪声（真英文句子会保留）
+    if(isMostlyLatinNoise(t)) return true;
+
     // 没有任何汉字 / 有效字符（纯符号、纯空白）
     if(!/[\u4e00-\u9fff\u3400-\u4dbf0-9A-Za-z]/.test(t)) return true;
     return false;
@@ -722,6 +923,8 @@
       if(isNoiseLine(c)) continue;
       c = stripTrailingPageNo(c);
       c = stripTrailingPinyinBeforeHan(c);
+      c = stripInjectedNoise(c);          // 清掉汉字间乱入的字母 / 数字
+      c = fixNearConfusion(c);            // 形近字上下文纠错
       if(!c || isNoiseLine(c)) continue;
       // 标题与正文粘连 → 拆开
       var pieces = splitGluedTitle(c);
@@ -759,14 +962,20 @@
     for(var j = 0; j < uniq.length; j++){
       var line = uniq[j];
 
-      // 短行且没有句末标点，且下一行较长 → 当作标题独立成段
-      if(!buf && !isSentenceEnd(line) && line.length <= 14){
+      // 短行且没有句末标点 → 可能是「标题」独立成段
+      // 判断要点：真标题通常很短（≤8字）且与下一行不连贯；
+      // 若两行能连成一句话（如"小兔子蹦蹦跳跳" + "地来到草地上。"），
+      // 应合并而不是拆开。
+      if(!buf && !isSentenceEnd(line) && line.length <= 8){
         var nextEnds = (j + 1 < uniq.length) && isSentenceEnd(uniq[j + 1]);
-        var nextLong = (j + 1 < uniq.length) && uniq[j + 1].length >= 14;
+        var nextLine = (j + 1 < uniq.length) ? uniq[j + 1] : '';
+        var nextLong = nextLine.length >= Math.max(14, line.length * 1.6);
         var isLast = (j === uniq.length - 1);
-        // 关键：如果这一行和下一行开头重复，说明是标题+正文的粘连，切出来
-        var nextStartsSame = (j + 1 < uniq.length) && uniq[j + 1].indexOf(line) === 0;
-        if(nextEnds || nextLong || isLast || nextStartsSame){
+        // 这一行和下一行开头重复 → 标题+正文粘连，切出来
+        var nextStartsSame = nextLine.indexOf(line) === 0;
+        // 下一行以「连接性/延续性开头」→ 说明是断句，不是标题
+        var nextContinues = /^(地|的|得|了|着|过|们|上|下|里|外|中|和|跟|与|又|还|也|就|才|便|而|可|是|在|把|被|让|给|到|从|向|往|对|为|会|能|要|想|看|说|走|跑|来|去|起|出|进|回)/.test(nextLine);
+        if(!nextContinues && (nextEnds || nextLong || isLast || nextStartsSame)){
           merged.push(line);
           continue;
         }
@@ -862,9 +1071,22 @@
       return cleanText((rf && rf.data && rf.data.text) || '');
     }
 
-    // 3) 择优（置信度最高的；相同则取文本更长的）
+    // 3) 择优：综合「置信度 + 汉字占比」评分
+    //    OCR 置信度对"识别成字母数字噪声"的行惩罚不足，
+    //    因此额外奖励汉字密度高、噪声字符少的结果。
+    function scoreCandidate(c){
+      var t = c.text || '';
+      var han = (t.match(/[\u4e00-\u9fff\u3400-\u4dbf]/g) || []).length;
+      var lat = (t.match(/[A-Za-z]/g) || []).length;
+      var dig = (t.match(/[0-9]/g) || []).length;
+      var total = han + lat + dig;
+      var hanRatio = total ? han / total : 0;
+      // 置信度为主体，汉字占比加成最多 ±12 分，噪声字符按个数扣分
+      return c.conf + hanRatio * 12 - lat * 0.6 - dig * 0.8;
+    }
+    cands.forEach(function(c){ c.score = scoreCandidate(c); });
     cands.sort(function(a, b){
-      if(b.conf !== a.conf) return b.conf - a.conf;
+      if(b.score !== a.score) return b.score - a.score;
       return b.text.length - a.text.length;
     });
     var best = cands[0];
@@ -924,6 +1146,13 @@
         });
 
         setProg(base + 1, '第 ' + pageNo + ' / ' + images.length + ' 页 · 正在准备…');
+
+        // 针对中文绘本的识别参数：更保守的字符分割、保留词间距
+        await worker.setParameters({
+          tessedit_char_blacklist: '丨丿丶乀乁丨|~`^',   // 屏蔽易误识的笔画符号
+          preserve_interword_spaces: '0',
+          textord_min_xheight: '8'
+        });
 
         images[idx].text = await recognizeBest(worker, images[idx].url, base, span, pageNo);
         renderPages();
@@ -1289,24 +1518,46 @@
   }
 
   // 语音自然度打分：分数越高越像真人
+  // 目标：把「真人级神经网络语音」排在最前，机械老语音排在最后
   function voiceScore(v){
     var n = (v.name || '').toLowerCase();
     var s = 0;
-    // Edge / Windows 的自然语音（最像真人）
-    if(/natural|neural/.test(n)) s += 100;
-    if(/xiaoxiao|xiaoyi|yunxi|yunxia|yunyang|xiaobei|xiaoni|晓晓|晓伊|云希|云夏/.test(n)) s += 90;
-    // 微软系
-    if(/microsoft/.test(n)) s += 50;
-    // 苹果的高质量语音
-    if(/siri|tingting|meijia|sinji|li-mu|yu-shu/.test(n)) s += 40;
-    // 本地基础语音
-    if(/google/.test(n)) s += 25;
-    // 中文（简体）优先
+
+    // ① 神经网络 / 自然语音（最像真人，最高优先）
+    if(/natural|neural|online/.test(n)) s += 200;
+    if(/xiaoxiao|xiaoyi|yunxi|yunxia|yunyang|xiaobei|xiaoni|xiaoqiu|yunjian|晓晓|晓伊|云希|云夏|云扬|晓北|晓妮|晓秋|云健/.test(n)) s += 160;
+
+    // ② 新一代高质量语音
+    if(/premium|enhanced|plus|siri/.test(n)) s += 120;
+
+    // ③ 平台加成：Edge/微软自然语音最自然
+    if(/microsoft/.test(n)) s += 60;
+    if(/google/.test(n)) s += 35;
+    if(/apple|tingting|meijia|sinji|li-mu|yu-shu|婷婷|美佳/.test(n)) s += 45;
+
+    // ④ 中文（简体）优先
     if(/^zh[-_]?(cn|hans)/i.test(v.lang)) s += 30;
     else if(/^zh/i.test(v.lang)) s += 10;
-    // 明显是机械老语音的减分
-    if(/eSpeak|espeak|compact|eloquence/i.test(n)) s -= 60;
+
+    // ⑤ 机械老语音大幅减分
+    if(/espeak|compact|eloquence|festival|pico|sam|albert|zarvox|bad news|good news|bells|boing|bubbles|cellos|jester|organ|trinoids|whisper|wobble|deranged|hysterical|pipe organ/i.test(n)) s -= 200;
+    if(/robot|synthetic|monotone/i.test(n)) s -= 80;
+
+    // ⑥ 明显更短的名称常是低质量占位语音
+    var raw = (v.name || '');
+    if(raw.length <= 4 && !/[a-z]/i.test(raw)) s -= 40;
+
     return s;
+  }
+
+  // 给语音分档：用于在下拉里标注「非常自然 / 自然 / 一般」
+  function voiceGrade(v){
+    var s = voiceScore(v);
+    if(s >= 150) return { txt: '★★★★★ 真人级', cls: 'v-best' };
+    if(s >= 100) return { txt: '★★★★ 很自然', cls: 'v-good' };
+    if(s >= 40)  return { txt: '★★★ 较自然', cls: 'v-ok' };
+    if(s >= 0)   return { txt: '★★ 一般', cls: 'v-meh' };
+    return { txt: '★ 偏机械', cls: 'v-bad' };
   }
 
   function buildVoiceList(){
@@ -1325,20 +1576,20 @@
     var recommended = zh.filter(function(v){ return voiceScore(v) >= 100; });
     var others = zh.filter(function(v){ return voiceScore(v) < 100; });
 
+    function optHTML(v){
+      var g = voiceGrade(v);
+      return '<option value="' + esc(v.name + '|' + v.lang) + '">' +
+             esc(v.name) + '  ·  ' + g.txt + '</option>';
+    }
+
     if(recommended.length){
-      html += '<optgroup label="★ 推荐（最像真人）">';
-      recommended.forEach(function(v){
-        html += '<option value="' + esc(v.name + '|' + v.lang) + '">' +
-                esc(v.name) + ' — ' + esc(v.lang) + '</option>';
-      });
+      html += '<optgroup label="★ 推荐（听起来更像真人）">';
+      recommended.forEach(function(v){ html += optHTML(v); });
       html += '</optgroup>';
     }
     if(others.length){
       html += '<optgroup label="其他中文语音">';
-      others.forEach(function(v){
-        html += '<option value="' + esc(v.name + '|' + v.lang) + '">' +
-                esc(v.name) + ' — ' + esc(v.lang) + '</option>';
-      });
+      others.forEach(function(v){ html += optHTML(v); });
       html += '</optgroup>';
     }
     sel.innerHTML = html;
@@ -1390,8 +1641,16 @@
       el.innerHTML = '⚠️ 这台设备没找到中文语音，可能念不出来。Windows 可在「设置→时间和语言→语音」里添加中文语音；苹果设备自带中文语音，一般没问题。';
       el.classList.add('warn');
     }else{
-      el.innerHTML = '🔊 使用语音：<b>' + escapeHtml(zhVoice.name) + '</b>';
+      var g = voiceGrade(zhVoice);
+      el.innerHTML = '🔊 使用语音：<b>' + escapeHtml(zhVoice.name) + '</b>' +
+                     ' <span class="vg ' + g.cls + '">' + g.txt + '</span>';
       el.classList.remove('warn');
+      // 选中的是很机械的语音 → 主动提示去换
+      if(voiceScore(zhVoice) < 0){
+        el.classList.add('warn');
+        el.innerHTML += '<br><span style="font-size:12.5px;">这个语音偏机械、听着像机器。' +
+                        '想更好听，建议用 <b>Edge 浏览器</b>打开（自带真人级中文语音），或在上面的「声音」里挑带 ★★★★ 以上的。</span>';
+      }
     }
   }
   if(synth){
@@ -1405,16 +1664,23 @@
   }
 
   // 把每页文字按标点切成句子
+  var segGapType = [];   // 每段结尾的标点类型，用来决定停顿长短
   function buildSegments(fromIdx, toIdx){
     segments = [];
     segPage = [];
+    segGapType = [];
     for(var i = fromIdx; i <= toIdx; i++){
       var txt = (images[i].text || '');
       if(!txt.trim()) continue;
       // 先按换行拆成自然段
       var paras = txt.split('\n');
       for(var q = 0; q < paras.length; q++){
-        var para = paras[q].replace(/\s+/g, '');
+        // 注意：只压缩连续空格，不能把英文单词间的空格也删掉
+        var para = paras[q].replace(/\s+/g, function(sp, off, whole){
+          var prev = whole.charAt(off - 1), next = whole.charAt(off + sp.length);
+          if(/[A-Za-z]/.test(prev) && /[A-Za-z]/.test(next)) return ' ';
+          return '';
+        }).trim();
         if(!para) continue;
         // 每段内按句末标点切句
         var parts = para.match(/[^。！？!?]+[。！？!?]?/g) || [para];
@@ -1426,13 +1692,43 @@
             var subs = p.match(/[^，,、；;]+[，,、；;]?/g) || [p];
             subs.forEach(function(s2){
               s2 = s2.trim();
-              if(s2){ segments.push(s2); segPage.push(i); }
+              if(s2){ pushSeg(s2, i); }
             });
           }else{
-            segments.push(p); segPage.push(i);
+            pushSeg(p, i);
           }
         }
       }
+    }
+  }
+
+  // 记录句子 + 它结尾的标点类型（决定停顿）
+  function pushSeg(text, pageIdx){
+    var last = text.charAt(text.length - 1);
+    var type = 'none';
+    if(/[。]/.test(last)) type = 'period';
+    else if(/[！]/.test(last)) type = 'exclaim';
+    else if(/[？]/.test(last)) type = 'question';
+    else if(/[，、；]/.test(last)) type = 'comma';
+    else if(/[：]/.test(last)) type = 'colon';
+    else if(/[…—]/.test(last)) type = 'ellipsis';
+    segments.push(text);
+    segPage.push(pageIdx);
+    segGapType.push(type);
+  }
+
+  // 根据句尾标点算出「句间停顿」毫秒数，让朗读有节奏、更像人
+  function gapFor(type){
+    var base = parseFloat(speedSlider.value) || 0.75;
+    var k = 1 / Math.max(0.5, base);   // 念得越慢，停顿也略长
+    switch(type){
+      case 'period':   return Math.round(300 * k);
+      case 'exclaim':
+      case 'question': return Math.round(360 * k);
+      case 'ellipsis': return Math.round(520 * k);
+      case 'colon':    return Math.round(240 * k);
+      case 'comma':    return Math.round(150 * k);
+      default:         return Math.round(260 * k);
     }
   }
 
@@ -1493,10 +1789,10 @@
     function advance(){
       if(fired) return;
       fired = true;
-      // 句间留一点空隙，语句更清楚；也避开部分浏览器的连续 speak 问题
+      // 按句尾标点决定停顿长短，让语气更像真人
       if(speaking && !paused){
         clearTimeout(gapTimer);
-        gapTimer = setTimeout(function(){ nextSeg(); }, 260);
+        gapTimer = setTimeout(function(){ nextSeg(); }, gapFor(segGapType[curSeg]));
       }
     }
 
@@ -1580,8 +1876,16 @@
     cleanLine: cleanLine,
     looksLikePinyin: looksLikePinyin,
     isNoiseLine: isNoiseLine,
+    stripInjectedNoise: stripInjectedNoise,
+    isMostlyLatinNoise: isMostlyLatinNoise,
+    fixNearConfusion: fixNearConfusion,
+    looksLikeEnglishWord: looksLikeEnglishWord,
+    voiceScore: voiceScore,
+    voiceGrade: voiceGrade,
+    gapFor: gapFor,
     buildSegments: buildSegments,
     getSegments: function(){ return segments.slice(); },
+    getGapTypes: function(){ return segGapType.slice(); },
     setImages: function(arr){ images = arr; }
   };
 
