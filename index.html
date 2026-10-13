@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>绘本朗读 · 一年级阅读好帮手</title>
+<style>
+  :root{
+    --bg:#fff8f0;
+    --card:#ffffff;
+    --ink:#2f2a26;
+    --ink-soft:#6b6259;
+    --line:#efe4d6;
+    --accent:#ff8a3d;
+    --accent-deep:#f26b1d;
+    --green:#38b26a;
+    --red:#e8563f;
+    --shadow:0 6px 22px rgba(180,140,100,.13);
+    --radius:18px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(1200px 500px at 50% -180px, #ffe9d2 0%, transparent 70%),
+      var(--bg);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif;
+    min-height:100vh;
+    padding:0 0 130px;
+  }
+  .wrap{max-width:760px;margin:0 auto;padding:0 16px;}
+
+  /* 顶部 */
+  header{padding:26px 0 14px;text-align:center;}
+  header h1{
+    margin:0;font-size:24px;letter-spacing:.5px;
+    font-weight:800;
+  }
+  header h1 .icon{font-size:22px;}
+  header p{margin:8px 0 0;color:var(--ink-soft);font-size:13.5px;line-height:1.6;}
+
+  /* 卡片 */
+  .card{
+    background:var(--card);border-radius:var(--radius);
+    box-shadow:var(--shadow);border:1px solid var(--line);
+    padding:16px;margin-bottom:14px;
+  }
+  .card h2{
+    font-size:15px;margin:0 0 12px;display:flex;align-items:center;gap:8px;
+    font-weight:700;
+  }
+  .step-no{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:21px;height:21px;border-radius:50%;
+    background:var(--accent);color:#fff;font-size:12px;font-weight:800;flex:none;
+  }
+
+  /* 环境提示 */
+  .env-warn{
+    display:none;font-size:12.5px;line-height:1.75;
+    background:#fff4ec;border:1px solid #f7d3b8;border-radius:11px;
+    padding:11px 13px;margin-bottom:13px;color:#a5562a;
+  }
+  .env-warn.on{display:block;}
+  .env-warn b{color:#8f4318;}
+
+  /* 上传区 */
+  .drop{
+    border:2px dashed #ffc89a;border-radius:14px;
+    background:#fffaf4;padding:26px 16px;text-align:center;
+    cursor:pointer;transition:.18s;
+  }
+  .drop:active{transform:scale(.99);background:#fff4e8;}
+  .drop .big{font-size:34px;line-height:1;margin-bottom:8px;}
+  .drop .t1{font-size:15px;font-weight:700;margin-bottom:4px;}
+  .drop .t2{font-size:12.5px;color:var(--ink-soft);}
+
+  /* 拍照/相册 选择按钮 */
+  .picker{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .pick{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:2px;padding:16px 8px;border-radius:14px;cursor:pointer;
+    border:1.5px solid var(--line);background:#fffdfa;font-family:inherit;
+    transition:.16s;-webkit-tap-highlight-color:transparent;
+  }
+  .pick:active{transform:scale(.97);}
+  .pick-cam{background:#fff6ee;border-color:#fbd8bb;}
+  .pick-cam:active{background:#ffeee0;}
+  .pick-alb{background:#f5faf6;border-color:#cbe7d6;}
+  .pick-alb:active{background:#eaf6ee;}
+  .pick-ico{font-size:26px;line-height:1.1;}
+  .pick-t{font-size:14.5px;font-weight:800;color:var(--ink);}
+  .pick-s{font-size:11px;color:var(--ink-soft);}
+
+  /* 缩略图 */
+  .thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:9px;margin-top:12px;}
+  .thumb{
+    position:relative;aspect-ratio:3/4;border-radius:11px;overflow:hidden;
+    border:1px solid var(--line);background:#f7f2ea;
+  }
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+  .thumb .del{
+    position:absolute;top:4px;right:4px;width:21px;height:21px;border-radius:50%;
+    background:rgba(0,0,0,.55);color:#fff;border:none;font-size:13px;line-height:1;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;
+  }
+  .thumb .no{
+    position:absolute;bottom:0;left:0;right:0;
+    background:linear-gradient(transparent,rgba(0,0,0,.62));
+    color:#fff;font-size:10.5px;padding:9px 5px 3px;text-align:center;
+  }
+  .thumb .del:active{background:var(--red);}
+
+  /* 按钮 */
+  .btn{
+    border:none;border-radius:13px;padding:13px 18px;font-size:15px;font-weight:700;
+    cursor:pointer;transition:.16s;font-family:inherit;
+    display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  }
+  .btn:active{transform:scale(.975);}
+  .btn:disabled{opacity:.42;cursor:not-allowed;transform:none;}
+  .btn-main{background:var(--accent);color:#fff;width:100%;box-shadow:0 5px 16px rgba(255,138,61,.32);}
+  .btn-main:not(:disabled):active{background:var(--accent-deep);}
+  .btn-ghost{background:#f7f2ea;color:var(--ink-soft);border:1px solid var(--line);}
+  .btn-sm{padding:10px 14px;font-size:13.5px;border-radius:11px;}
+
+  .row{display:flex;gap:9px;}
+  .row .btn{flex:1;}
+
+  /* 识别进度 */
+  .prog{margin-top:12px;display:none;}
+  .prog.on{display:block;}
+  .bar{height:8px;border-radius:99px;background:#f2e8dc;overflow:hidden;}
+  .bar>i{
+    display:block;height:100%;width:0;border-radius:99px;
+    background:linear-gradient(90deg,#ffb066,var(--accent));transition:width .25s;
+  }
+  .ptxt{font-size:12.5px;color:var(--ink-soft);margin-top:7px;text-align:center;}
+
+  /* 文字结果 */
+  .pages{}
+  .page{
+    border:1px solid var(--line);border-radius:14px;
+    margin-bottom:11px;overflow:hidden;background:#fff;
+  }
+  .page-head{
+    display:flex;align-items:center;gap:8px;
+    padding:9px 12px;background:#fdf7f0;border-bottom:1px solid var(--line);
+    font-size:13px;font-weight:700;color:var(--ink-soft);
+  }
+  .page-head .thumb-mini{
+    width:30px;height:38px;border-radius:6px;object-fit:cover;flex:none;border:1px solid var(--line);
+  }
+  .page-head .spacer{flex:1;}
+  .page-head .tag{
+    font-size:11px;font-weight:700;padding:3px 8px;border-radius:99px;
+    background:#eaf7ef;color:var(--green);
+  }
+  textarea{
+    width:100%;border:none;outline:none;resize:vertical;
+    font-family:inherit;font-size:16.5px;line-height:1.85;color:var(--ink);
+    padding:12px;min-height:96px;background:#fff;
+  }
+  textarea::placeholder{color:#c3b8ab;}
+  .page-foot{
+    display:flex;align-items:center;gap:8px;padding:0 10px 10px;
+    font-size:12px;
+  }
+  .page-foot .info{color:var(--ink-soft);flex:1;}
+
+  /* 语速 */
+  .speed-wrap{display:flex;align-items:center;gap:12px;}
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;flex:1;height:6px;border-radius:99px;
+    background:#f0e5d8;outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:24px;height:24px;border-radius:50%;
+    background:var(--accent);cursor:pointer;box-shadow:0 2px 7px rgba(255,138,61,.45);
+    border:3px solid #fff;
+  }
+  .speed-val{
+    font-size:13.5px;font-weight:800;color:var(--accent-deep);
+    min-width:74px;text-align:right;
+  }
+  .speed-tips{font-size:12px;color:var(--ink-soft);margin-top:8px;line-height:1.6;}
+  .voice-hint{
+    font-size:12px;color:var(--ink-soft);margin-top:10px;line-height:1.6;
+    background:#f7f9f7;border:1px solid #e6efe8;border-radius:10px;padding:8px 11px;
+  }
+  .voice-hint.warn{background:#fff8f2;border-color:#f5dcc8;color:#b06a2e;}
+
+  /* 底部播放条 */
+  .player{
+    position:fixed;left:0;right:0;bottom:0;z-index:50;
+    background:rgba(255,255,255,.96);backdrop-filter:blur(14px);
+    border-top:1px solid var(--line);
+    box-shadow:0 -5px 26px rgba(180,140,100,.15);
+    padding:11px 16px calc(11px + env(safe-area-inset-bottom));
+    transition:transform .3s;
+  }
+  .player-inner{max-width:760px;margin:0 auto;}
+  .now{
+    font-size:12.5px;color:var(--ink-soft);margin-bottom:9px;
+    display:flex;align-items:center;gap:7px;min-height:17px;
+  }
+  .now .dot{
+    width:7px;height:7px;border-radius:50%;background:#d8cdc0;flex:none;
+  }
+  .now.playing .dot{background:var(--green);animation:pulse 1.1s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.75)}}
+  .now .txt{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ctrls{display:flex;gap:10px;align-items:center;}
+  .ctrls .btn{flex:1;}
+  .btn-play{background:var(--green);color:#fff;box-shadow:0 5px 15px rgba(56,178,106,.3);}
+  .btn-play.pausing{background:#f5a623;box-shadow:0 5px 15px rgba(245,166,35,.3);}
+  .btn-stop{background:#f7f2ea;color:#c25a3f;border:1px solid #f0dcd2;flex:0 0 96px!important;}
+
+  .empty{
+    text-align:center;color:var(--ink-soft);font-size:13.5px;
+    padding:26px 12px;line-height:1.7;
+  }
+  .empty .big{font-size:36px;display:block;margin-bottom:9px;opacity:.55;}
+
+  .hide{display:none!important;}
+
+  /* 拼音提示小徽章 */
+  .pinyin-note{
+    font-size:11.5px;color:#a9946f;background:#fffaf0;border:1px dashed #f0dfc0;
+    padding:7px 10px;border-radius:9px;margin-bottom:10px;line-height:1.6;
+  }
+
+  /* 吐司 */
+  .toast{
+    position:fixed;left:50%;top:26px;transform:translate(-50%,-80px);
+    background:rgba(47,42,38,.93);color:#fff;padding:11px 20px;border-radius:12px;
+    font-size:13.5px;z-index:99;transition:transform .3s;max-width:86vw;text-align:center;
+    backdrop-filter:blur(6px);
+  }
+  .toast.on{transform:translate(-50%,0);}
+
+  @media(max-width:420px){
+    header h1{font-size:21px;}
+    .card{padding:14px;}
+  }
+
+  /* 触屏设备：加大点击区域 */
+  @media (hover: none) and (pointer: coarse){
+    .btn{min-height:50px;font-size:15.5px;}
+    .ctrls .btn{min-height:54px;font-size:16.5px;}
+    .btn-stop{flex:0 0 100px!important;}
+    .pick{min-height:104px;}
+    textarea{font-size:17px;line-height:1.9;min-height:120px;}
+    input[type=range]{height:8px;}
+    input[type=range]::-webkit-slider-thumb{width:28px;height:28px;}
+    .thumb .del{width:26px;height:26px;font-size:15px;}
+    .page-foot .btn-sm{min-height:42px;font-size:14px;}
+    body{padding-bottom:150px;}
+  }
+  /* 小屏竖屏细节 */
+  @media(max-width:380px){
+    .picker{gap:8px;}
+    .pick{padding:13px 6px;}
+    .pick-ico{font-size:23px;}
+    .pick-t{font-size:13.5px;}
+    .speed-val{min-width:64px;font-size:12.5px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1><span class="icon">📖</span> 绘本朗读</h1>
+    <p>拍下绘本页面 → 自动认字 → 慢速念给孩子听<br>只读正文，自动跳过拼音</p>
+  </header>
+
+  <!-- 1 上传 -->
+  <div class="card">
+    <h2><span class="step-no">1</span> 上传绘本照片</h2>
+    <div class="env-warn" id="envWarn">
+      <b>⚠️ 打开方式不对，识别会失败</b><br>
+      网络连接似乎有问题。识别引擎需要联网加载一次（约 20MB，之后浏览器会缓存，第二次就快了）。<br>请检查网络后刷新页面。
+    </div>
+
+    <!-- 手机端按钮 -->
+    <div class="picker">
+      <button class="pick pick-cam" id="pickCam">
+        <span class="pick-ico">📷</span>
+        <span class="pick-t">拍绘本</span>
+        <span class="pick-s">用相机拍当前的页面</span>
+      </button>
+      <button class="pick pick-alb" id="pickAlb">
+        <span class="pick-ico">🖼️</span>
+        <span class="pick-t">从相册选</span>
+        <span class="pick-s">可一次选多张</span>
+      </button>
+    </div>
+
+    <input type="file" id="fileCam" accept="image/*" capture="environment" class="hide">
+    <input type="file" id="fileAlb" accept="image/*" multiple class="hide">
+    <div class="thumbs" id="thumbs"></div>
+
+    <div class="prog" id="prog">
+      <div class="bar"><i id="barInner"></i></div>
+      <div class="ptxt" id="progTxt">正在识别…</div>
+    </div>
+
+    <div class="row" style="margin-top:12px;">
+      <button class="btn btn-main" id="btnOcr" disabled>开始识字</button>
+    </div>
+  </div>
+
+  <!-- 2 文字 -->
+  <div class="card" id="cardText">
+    <h2><span class="step-no">2</span> 文字内容（可修改）</h2>
+    <div class="pinyin-note">
+      💡 已自动去掉拼音和注音字母。如有个别没认准的字，直接点文字改一下就好。
+    </div>
+    <div class="pages" id="pages">
+      <div class="empty"><span class="big">📝</span>还没有内容<br>先上传照片并点「开始识字」</div>
+    </div>
+  </div>
+
+  <!-- 3 语速 -->
+  <div class="card">
+    <h2><span class="step-no">3</span> 朗读设置</h2>
+    <div class="speed-wrap">
+      <span style="font-size:13.5px;color:var(--ink-soft);">语速</span>
+      <input type="range" id="speed" min="0.5" max="1.2" step="0.05" value="0.75">
+      <span class="speed-val" id="speedVal">慢速 0.75×</span>
+    </div>
+    <div class="speed-tips">数值越小念得越慢。0.7~0.8 适合一年级小朋友跟着读。</div>
+    <div class="voice-hint" id="voiceHint">⏳ 正在读取设备的语音…</div>
+  </div>
+</div>
+
+<!-- 播放条 -->
+<div class="player">
+  <div class="player-inner">
+    <div class="now" id="now">
+      <span class="dot"></span>
+      <span class="txt" id="nowTxt">准备好了，点「开始朗读」</span>
+    </div>
+    <div class="ctrls">
+      <button class="btn btn-play" id="btnPlay" disabled>▶ 开始朗读</button>
+      <button class="btn btn-stop" id="btnStop" disabled>■ 结束</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.0/dist/tesseract.min.js"></script>
+<script>
+(function(){
+  'use strict';
+
+  var $ = function(id){ return document.getElementById(id); };
+
+  /* ============ 环境检测 ============ */
+  var IS_FILE = (location.protocol === 'file:');
+  (function checkEnv(){
+    if(!IS_FILE) return;
+    var box = $('envWarn');
+    if(!box) return;
+    box.classList.add('on');
+  })();
+
+  /* ============ 状态 ============ */
+  var images = [];      // {id, file, url, text}
+  var seq = 0;
+  var recognizing = false;
+
+  /* ============ 吐司 ============ */
+  var toastTimer = null;
+  function toast(msg, ms){
+    var t = $('toast');
+    t.textContent = msg;
+    t.classList.add('on');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ t.classList.remove('on'); }, ms || 2200);
+  }
+
+  /* ============ 上传 ============ */
+  $('pickCam').addEventListener('click', function(){ $('fileCam').click(); });
+  $('pickAlb').addEventListener('click', function(){ $('fileAlb').click(); });
+
+  function handleFiles(files){
+    var list = Array.prototype.slice.call(files || []);
+    if(!list.length) return;
+    var added = 0;
+    list.forEach(function(f){
+      if(!/^image/i.test(f.type)) return;
+      var id = 'img_' + (++seq);
+      images.push({ id: id, file: f, url: URL.createObjectURL(f), text: '' });
+      added++;
+      // 后台异步压缩，压缩完替换 url
+      shrinkImage(f).then(function(smallUrl){
+        var im = images.find(function(x){ return x.id === id; });
+        if(im && smallUrl){ URL.revokeObjectURL(im.url); im.url = smallUrl; renderThumbs(); renderPages(); }
+      }).catch(function(){});
+    });
+    if(!added){ toast('请选择图片文件'); return; }
+    renderThumbs();
+    renderPages();
+    $('btnOcr').disabled = recognizing || images.length === 0;
+    toast('已添加 ' + added + ' 张，点「开始识字」');
+  }
+
+  // 手机照片通常 4~8MB，压到长边 1600px 能大幅加快识别
+  function shrinkImage(file){
+    return new Promise(function(resolve){
+      if(!/^image/i.test(file.type)) return resolve(null);
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function(){
+        try{
+          var MAX = 1600;
+          var w = img.naturalWidth, h = img.naturalHeight;
+          if(Math.max(w, h) <= MAX){ URL.revokeObjectURL(url); return resolve(null); }
+          var scale = MAX / Math.max(w, h);
+          var cw = Math.round(w * scale), ch = Math.round(h * scale);
+          var c = document.createElement('canvas');
+          c.width = cw; c.height = ch;
+          c.getContext('2d').drawImage(img, 0, 0, cw, ch);
+          c.toBlob(function(blob){
+            URL.revokeObjectURL(url);
+            resolve(blob ? URL.createObjectURL(blob) : null);
+          }, 'image/jpeg', 0.88);
+        }catch(e){ URL.revokeObjectURL(url); resolve(null); }
+      };
+      img.onerror = function(){ URL.revokeObjectURL(url); resolve(null); };
+      img.src = url;
+    });
+  }
+
+  $('fileCam').addEventListener('change', function(e){ handleFiles(e.target.files); e.target.value = ''; });
+  $('fileAlb').addEventListener('change', function(e){ handleFiles(e.target.files); e.target.value = ''; });
+
+  function renderThumbs(){
+    var box = $('thumbs');
+    if(!images.length){ box.innerHTML = ''; return; }
+    box.innerHTML = images.map(function(im, i){
+      return '<div class="thumb">' +
+        '<img src="' + im.url + '" alt="">' +
+        '<button class="del" data-id="' + im.id + '" title="删除">✕</button>' +
+        '<div class="no">第 ' + (i + 1) + ' 页</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  $('thumbs').addEventListener('click', function(e){
+    var btn = e.target.closest('.del');
+    if(!btn) return;
+    if(recognizing){ toast('识别中，请稍候'); return; }
+    var id = btn.getAttribute('data-id');
+    var idx = images.findIndex(function(x){ return x.id === id; });
+    if(idx < 0) return;
+    URL.revokeObjectURL(images[idx].url);
+    images.splice(idx, 1);
+    renderThumbs();
+    renderPages();
+    $('btnOcr').disabled = images.length === 0;
+  });
+
+  function emptyHTML(){
+    return '<div class="empty"><span class="big">📝</span>还没有内容<br>先上传照片并点「开始识字」</div>';
+  }
+
+  /* ============ 拼音清洗 ============ */
+  /*
+    去掉：带声调的拼音字母、注音符号、纯拼音行、括号里的拼音
+    保留：汉字、中文标点、数字、英文字母单词（如 "OK" 很难判断，一律尽量保守）
+  */
+  var PINYIN_CHARS = /[āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜüĀÁǍÀĒÉĚÈĪÍǏÌŌÓǑÒŪÚǓÙǕǗǙǛÜ]/;
+  var ZHUYIN = /[\u3105-\u3129\u31A0-\u31BF]/;
+
+  function hasHan(s){ return /[\u4e00-\u9fff\u3400-\u4dbf]/.test(s); }
+
+  // 判断一个 token 是否像拼音（无声调也需要靠上下文，这里只处理明显情况）
+  function looksLikePinyin(word){
+    if(PINYIN_CHARS.test(word)) return true;
+    if(ZHUYIN.test(word)) return true;
+    // 纯拉丁字母且全是小写、长度 <= 6，且不是常见英文词 —— 一年级绘本里正文基本是汉字
+    if(/^[a-zü]+$/.test(word) && word.length <= 6){
+      // 排除几个绘本里常出现的英文
+      if(/^(ok|no|yes|hi|wow|oh|my)$/.test(word)) return false;
+      return true;
+    }
+    return false;
+  }
+
+  function cleanLine(line){
+    var s = line;
+    // 去掉括号内的拼音：[xiǎo] （xiǎo） 等
+    s = s.replace(/[\[\(（【]\s*[a-zāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜü\s'’·\-]+\s*[\]\)）】]/gi, '');
+    // 去掉孤立的声调符号 / 分隔符
+    s = s.replace(/[ˇˊˋ˙]/g, '');
+    var parts = s.split(/(\s+)/);
+    var out = [];
+    for(var i = 0; i < parts.length; i++){
+      var p = parts[i];
+      if(!p) continue;
+      if(/^\s+$/.test(p)){ continue; }   // 空格单独处理，先跳过
+      // 去掉两端的非文字、非标点字符，保留汉字 / 数字 / 字母 / 中英文标点
+      var core = p.replace(/^[^\u4e00-\u9fff\u3400-\u4dbfA-Za-z0-9üāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ，。！？、；：“”‘’《》—…（）,.!?;:'"]+|[^\u4e00-\u9fff\u3400-\u4dbfA-Za-z0-9üāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ，。！？、；：“”‘’《》—…（）,.!?;:'"]+$/g, '');
+      if(!core) continue;
+      if(looksLikePinyin(core)) continue;
+      out.push(p);
+    }
+    s = out.join('');
+    // 半角标点统一转中文标点，保证朗读有停顿
+    s = s.replace(/,/g, '，').replace(/!/g, '！').replace(/\?/g, '？')
+         .replace(/;/g, '；').replace(/:(?![\/])/g, '：');
+    // 汉字/标点之间的多余空格去掉，但保留英文单词间的空格
+    s = s.replace(/([\u4e00-\u9fff\u3400-\u4dbf，。！？、；：“”‘’《》—…（）])\s+(?=[\u4e00-\u9fff\u3400-\u4dbf，。！？、；：“”‘’《》—…（）])/g, '$1');
+    s = s.replace(/\s+/g, '');
+    return s.trim();
+  }
+
+  function isNoiseLine(line){
+    var t = line.trim();
+    if(!t) return true;
+    // 没有任何汉字 / 有效字符（纯符号、纯空白）
+    if(!/[\u4e00-\u9fff\u3400-\u4dbf0-9A-Za-z]/.test(t)) return true;
+    return false;
+  }
+
+  function cleanText(raw){
+    // 保留全部文字（含标题、页码、重复内容），只去除拼音
+    var lines = raw.replace(/\r/g, '').split('\n');
+    var kept = [];
+    for(var i = 0; i < lines.length; i++){
+      var c = cleanLine(lines[i]);
+      if(isNoiseLine(c)) continue;
+      kept.push(c);
+    }
+    // 用换行连接，让标题、正文各自成句，朗读时自然停顿
+    return kept.join('\n');
+  }
+
+  /* ============ OCR ============ */
+  $('btnOcr').addEventListener('click', runOcr);
+
+  function setProg(pct, txt){
+    $('prog').classList.add('on');
+    $('barInner').style.width = Math.max(0, Math.min(100, pct)) + '%';
+    $('progTxt').textContent = txt || '';
+  }
+
+  async function runOcr(){
+    if(recognizing || !images.length) return;
+    if(typeof Tesseract === 'undefined'){
+      toast('识别组件未加载，请刷新页面重试');
+      return;
+    }
+    recognizing = true;
+    $('btnOcr').disabled = true;
+    $('btnOcr').textContent = '识别中…';
+    setProg(2, '正在准备识别引擎…');
+
+    var basePath = getBasePath();
+    // 关键：file:// 打开时不能使用 Web Worker（跨域限制），改用主线程
+    var useWorker = (location.protocol !== 'file:');
+
+    var worker = null;
+    try{
+      setProg(5, '正在加载识别引擎（第一次稍慢，请稍等）…');
+
+      worker = await Tesseract.createWorker('chi_sim', 1, {
+        workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.0/dist/worker.min.js',
+        corePath:   'https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.0/',
+        langPath:   'https://cdn.jsdelivr.net/npm/@tesseract.js-data/chi_sim@1.0.0/4.0.0/',
+        gzip: true,
+        workerBlobURL: useWorker,
+        logger: function(m){
+          if(m.status === 'loading language traineddata' || m.status === 'loading language traineddata (from cache)'){
+            var p = m.progress ? Math.round(m.progress * 100) : 0;
+            setProg(5 + p * 0.12, '正在读取中文语言包… ' + p + '%');
+          }else if(m.status === 'initializing api' || m.status === 'initialized api'){
+            setProg(20, '正在初始化…');
+          }else if(m.status === 'loading tesseract core'){
+            setProg(3, '正在加载识别核心…');
+          }
+        }
+      });
+
+      for(var idx = 0; idx < images.length; idx++){
+        var base = 20 + idx / images.length * 78;
+        var span = 78 / images.length;
+        setProg(base + 1, '第 ' + (idx + 1) + ' / ' + images.length + ' 页 · 正在识别…');
+
+        // 每次重新绑定进度日志
+        worker.setLogger && worker.setLogger(function(m){
+          if(m.status === 'recognizing text'){
+            setProg(base + 1 + (m.progress || 0) * (span - 2),
+              '第 ' + (idx + 1) + ' / ' + images.length + ' 页 · 识别中 ' + Math.round((m.progress || 0) * 100) + '%');
+          }
+        });
+
+        var ret = await worker.recognize(images[idx].url);
+        images[idx].text = cleanText((ret && ret.data && ret.data.text) || '');
+        renderPages();
+      }
+
+      setProg(100, '识别完成 ✓');
+      var total = images.reduce(function(a, b){ return a + b.text.length; }, 0);
+      toast(total ? '识别完成，共 ' + total + ' 个字' : '没有识别到文字，试试更清晰的照片');
+    }catch(err){
+      console.error(err);
+      setProg(0, '识别出错');
+      var msg = (err && err.message) ? err.message : '未知错误';
+      if(/fetch|network|cross|CORS|Failed/i.test(msg)){
+        toast('识别失败：拿不到识别文件。请确认 vendor 文件夹和本页面在同一目录下', 4200);
+      }else{
+        toast('识别失败：' + msg, 3600);
+      }
+    }finally{
+      try{ if(worker) await worker.terminate(); }catch(e){}
+      recognizing = false;
+      $('btnOcr').textContent = '开始识字';
+      $('btnOcr').disabled = images.length === 0;
+      setTimeout(function(){ $('prog').classList.remove('on'); }, 1600);
+      renderPages();
+    }
+  }
+
+  // 取当前页面所在目录，拼接本地资源路径
+  function getBasePath(){
+    var p = location.pathname;
+    p = p.substring(0, p.lastIndexOf('/') + 1);
+    if(location.protocol === 'file:') return p;      // 相对路径
+    return p;                                        // http 下也是相对路径即可
+  }
+
+  /* ============ 渲染文字 ============ */
+  function renderPages(){
+    var box = $('pages');
+    if(!images.length){ box.innerHTML = emptyHTML(); updatePlayBtn(); return; }
+
+    box.innerHTML = images.map(function(im, i){
+      var n = im.text.replace(/\s/g, '').length;
+      return '<div class="page">' +
+        '<div class="page-head">' +
+          '<img class="thumb-mini" src="' + im.url + '" alt="">' +
+          '<span>第 ' + (i + 1) + ' 页</span>' +
+          '<span class="spacer"></span>' +
+          '<span class="tag">' + (n ? n + ' 字' : '待识别') + '</span>' +
+        '</div>' +
+        '<textarea data-id="' + im.id + '" spellcheck="false" ' +
+          'placeholder="这一页的文字（识别后会自动填在这里）">' +
+          escapeHtml(im.text) +
+        '</textarea>' +
+        '<div class="page-foot">' +
+          '<span class="info">' + (n ? '可点击文字修改' : '') + '</span>' +
+          '<button class="btn btn-ghost btn-sm" data-clear="' + im.id + '">清空本页</button>' +
+          '<button class="btn btn-ghost btn-sm" data-readone="' + im.id + '">只读这页</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    updatePlayBtn();
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+
+  $('pages').addEventListener('input', function(e){
+    if(e.target.tagName !== 'TEXTAREA') return;
+    var id = e.target.getAttribute('data-id');
+    var im = images.find(function(x){ return x.id === id; });
+    if(!im) return;
+    im.text = e.target.value;
+    var tag = e.target.closest('.page').querySelector('.tag');
+    if(tag){
+      var n = im.text.replace(/\s/g, '').length;
+      tag.textContent = n ? n + ' 字' : '空白';
+    }
+    updatePlayBtn();
+  });
+
+  $('pages').addEventListener('click', function(e){
+    var c = e.target.closest('[data-clear]');
+    if(c){
+      var id1 = c.getAttribute('data-clear');
+      var im1 = images.find(function(x){ return x.id === id1; });
+      if(im1){ im1.text = ''; renderPages(); }
+      return;
+    }
+    var r = e.target.closest('[data-readone]');
+    if(r){
+      var id2 = r.getAttribute('data-readone');
+      var idx2 = images.findIndex(function(x){ return x.id === id2; });
+      if(idx2 < 0) return;
+      if(!images[idx2].text.trim()){ toast('这一页还没有文字'); return; }
+      playFrom(idx2, idx2);
+    }
+  });
+
+  /* ============ 语速 ============ */
+  var speedSlider = $('speed');
+  function speedLabel(v){
+    var n = parseFloat(v);
+    var label = n <= 0.65 ? '很慢' : (n <= 0.85 ? '慢速' : (n <= 1.0 ? '正常' : '稍快'));
+    $('speedVal').textContent = label + ' ' + n.toFixed(2) + '×';
+  }
+  speedSlider.addEventListener('input', function(){
+    speedLabel(this.value);
+    if(speaking && !paused) restartCurrentAtNewSpeed();
+  });
+  speedLabel(speedSlider.value);
+
+  /* ============ 朗读引擎 ============ */
+  var synth = window.speechSynthesis;
+  var voices = [];
+  var zhVoice = null;
+  var speaking = false;
+  var paused = false;
+  var curSeg = -1;        // 当前段落序号
+  var segments = [];      // 切分后的句子
+  var segPage = [];       // 每段属于第几页
+  var unlocked = false;   // iOS 语音是否已解锁
+
+  // iOS/iPadOS 要求：语音必须在用户点击手势内"激活"一次，否则无声
+  function unlockSpeech(){
+    if(unlocked || !synth) return;
+    unlocked = true;
+    try{
+      var u = new SpeechSynthesisUtterance(' ');
+      u.volume = 0;
+      u.rate = 2;
+      u.lang = 'zh-CN';
+      if(zhVoice) u.voice = zhVoice;
+      synth.speak(u);
+      synth.cancel();
+    }catch(e){}
+  }
+
+  // 任何一次点击都可以用来解锁
+  ['click','touchstart','touchend'].forEach(function(evt){
+    document.addEventListener(evt, function once(){
+      unlockSpeech();
+      document.removeEventListener(evt, once);
+    }, { once: true, passive: true });
+  });
+
+  function loadVoices(){
+    if(!synth) return;
+    voices = synth.getVoices() || [];
+    zhVoice = voices.find(function(v){ return /^zh[-_]?(CN|Hans|SG)/i.test(v.lang); }) ||
+              voices.find(function(v){ return /^zh/i.test(v.lang); }) ||
+              null;
+    // 有语音了，更新提示
+    if(voices.length && !speaking) updateVoiceHint();
+  }
+
+  function updateVoiceHint(){
+    var el = $('voiceHint');
+    if(!el) return;
+    if(!synth){
+      el.innerHTML = '⚠️ 当前浏览器不支持语音朗读，请用 <b>Chrome / Edge / Safari</b> 打开。';
+      el.classList.add('warn');
+      return;
+    }
+    if(!voices.length){
+      el.innerHTML = '⏳ 正在读取设备的语音…如果长时间没反应，请检查系统是否安装了中文语音。';
+      return;
+    }
+    if(!zhVoice){
+      el.innerHTML = '⚠️ 这台设备没找到中文语音，可能念不出来。Windows 可在「设置→时间和语言→语音」里添加中文语音；苹果设备自带中文语音，一般没问题。';
+      el.classList.add('warn');
+    }else{
+      el.innerHTML = '🔊 使用语音：<b>' + escapeHtml(zhVoice.name) + '</b>';
+      el.classList.remove('warn');
+    }
+  }
+  if(synth){
+    loadVoices();
+    if(synth.onvoiceschanged !== undefined) synth.onvoiceschanged = loadVoices;
+    // 某些浏览器要等一下
+    setTimeout(loadVoices, 400);
+    setTimeout(loadVoices, 1200);
+  }else{
+    toast('当前浏览器不支持语音朗读，建议用 Chrome / Edge / Safari 打开');
+  }
+
+  // 把每页文字按标点切成句子
+  function buildSegments(fromIdx, toIdx){
+    segments = [];
+    segPage = [];
+    for(var i = fromIdx; i <= toIdx; i++){
+      var txt = (images[i].text || '');
+      if(!txt.trim()) continue;
+      // 先按换行拆成自然段
+      var paras = txt.split('\n');
+      for(var q = 0; q < paras.length; q++){
+        var para = paras[q].replace(/\s+/g, '');
+        if(!para) continue;
+        // 每段内按句末标点切句
+        var parts = para.match(/[^。！？!?]+[。！？!?]?/g) || [para];
+        for(var j = 0; j < parts.length; j++){
+          var p = parts[j].trim();
+          if(!p) continue;
+          // 过长的句子再按逗号断，方便慢读
+          if(p.length > 24){
+            var subs = p.match(/[^，,、；;]+[，,、；;]?/g) || [p];
+            subs.forEach(function(s2){
+              s2 = s2.trim();
+              if(s2){ segments.push(s2); segPage.push(i); }
+            });
+          }else{
+            segments.push(p); segPage.push(i);
+          }
+        }
+      }
+    }
+  }
+
+  function updatePlayBtn(){
+    var total = images.reduce(function(a, b){ return a + (b.text ? b.text.replace(/\s/g,'').length : 0); }, 0);
+    $('btnPlay').disabled = total === 0;
+  }
+
+  $('btnPlay').addEventListener('click', function(){
+    if(!synth){ toast('当前浏览器不支持语音朗读'); return; }
+    unlockSpeech();     // iOS 必须：在点击手势内解锁
+    if(!speaking){
+      playFrom(0, images.length - 1);
+    }else if(paused){
+      doResume();
+    }else{
+      doPause();
+    }
+  });
+
+  $('btnStop').addEventListener('click', function(){
+    stopAll(true);
+  });
+
+  function playFrom(fromIdx, toIdx){
+    if(!synth){ toast('当前浏览器不支持语音朗读'); return; }
+    buildSegments(fromIdx, toIdx);
+    if(!segments.length){ toast('没有可朗读的文字内容'); return; }
+    stopAll(false);
+    speaking = true;
+    paused = false;
+    curSeg = -1;
+    $('btnPlay').textContent = '⏸ 暂停';
+    $('btnPlay').classList.add('pausing');
+    $('btnStop').disabled = false;
+    nextSeg();
+  }
+
+  function nextSeg(){
+    if(!speaking || paused) return;
+    curSeg++;
+    if(curSeg >= segments.length){
+      stopAll(false);
+      toast('念完啦 🎉');
+      return;
+    }
+    var text = segments[curSeg];
+    var page = segPage[curSeg] + 1;
+
+    var u = new SpeechSynthesisUtterance(text);
+    u.lang = 'zh-CN';
+    if(zhVoice) u.voice = zhVoice;
+    u.rate = parseFloat(speedSlider.value);
+    u.pitch = 1.0;
+    u.volume = 1.0;
+
+    var fired = false;   // 防止 end/error 重复推进
+    function advance(){
+      if(fired) return;
+      fired = true;
+      // 句间留一点空隙，语句更清楚；也避开部分浏览器的连续 speak 问题
+      if(speaking && !paused){
+        clearTimeout(gapTimer);
+        gapTimer = setTimeout(function(){ nextSeg(); }, 260);
+      }
+    }
+
+    u.onstart = function(){
+      setNow('第 ' + page + ' 页 · ' + text, true);
+    };
+    u.onend = function(){ advance(); };
+    u.onerror = function(ev){
+      if(ev && (ev.error === 'interrupted' || ev.error === 'canceled')) return;
+      advance();
+    };
+
+    lastUtter = u;
+    try{
+      synth.speak(u);
+      // 兜底：个别手机浏览器不触发 onend，用时长估算推进
+      clearTimeout(watchdog);
+      var est = Math.max(2500, text.length * 420 / Math.max(0.5, parseFloat(speedSlider.value)));
+      watchdog = setTimeout(function(){
+        if(speaking && !paused && !fired && lastUtter === u && !synth.speaking){ advance(); }
+      }, est + 4000);
+    }catch(err){
+      console.error(err);
+      advance();
+    }
+  }
+
+  var lastUtter = null;
+  var gapTimer = null;
+  var watchdog = null;
+
+  function doPause(){
+    if(!speaking || paused) return;
+    paused = true;
+    try{ synth.pause(); }catch(e){}
+    $('btnPlay').textContent = '▶ 继续';
+    setNow('已暂停 · ' + (segments[curSeg] || ''), false);
+  }
+
+  function doResume(){
+    if(!speaking || !paused) return;
+    paused = false;
+    $('btnPlay').textContent = '⏸ 暂停';
+    try{
+      if(synth.paused){ synth.resume(); setNow('继续朗读…', true); return; }
+    }catch(e){}
+    // 有的浏览器 pause 后 resume 无效，重念当前句
+    curSeg--;
+    nextSeg();
+  }
+
+  // 改语速时：重念当前句，用新语速
+  function restartCurrentAtNewSpeed(){
+    if(!speaking || paused) return;
+    try{ synth.cancel(); }catch(e){}
+    curSeg--;
+    setTimeout(function(){ if(speaking && !paused) nextSeg(); }, 60);
+  }
+
+  function stopAll(showTip){
+    speaking = false;
+    paused = false;
+    clearTimeout(gapTimer);
+    clearTimeout(watchdog);
+    try{ synth.cancel(); }catch(e){}
+    $('btnPlay').textContent = '▶ 开始朗读';
+    $('btnPlay').classList.remove('pausing');
+    $('btnStop').disabled = true;
+    setNow('已结束', false);
+    curSeg = -1;
+    if(showTip) toast('已结束朗读');
+  }
+
+  function setNow(text, playing){
+    var box = $('now');
+    $('nowTxt').textContent = text;
+    if(playing) box.classList.add('playing');
+    else box.classList.remove('playing');
+  }
+
+  // 离开页面 / 切到后台时停掉，避免回来后状态错乱
+  window.addEventListener('beforeunload', function(){
+    try{ synth && synth.cancel(); }catch(e){}
+  });
+  document.addEventListener('visibilitychange', function(){
+    if(document.hidden && speaking && !paused){
+      // 手机锁屏/切后台会打断语音，此处统一置为暂停，回来点「继续」
+      doPause();
+    }
+  });
+
+})();
+</script>
+</body>
+</html>
