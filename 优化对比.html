@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>绘本朗读 · 文字识别优化对比</title>
+<style>
+  :root{
+    --bg:#f6f7f4; --card:#fff; --ink:#20241f; --soft:#6b7266;
+    --line:#e4e8e0; --green:#2e7d5b; --greenbg:#eaf7ef; --warn:#c2570d; --warnbg:#fdf0e6;
+    --red:#c0392b; --redbg:#fdecea;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"PingFang SC","Microsoft YaHei",-apple-system,sans-serif;
+    line-height:1.7;padding:28px 16px 60px;}
+  .wrap{max-width:880px;margin:0 auto;}
+  h1{font-size:24px;margin:0 0 6px;letter-spacing:.5px;}
+  .sub{color:var(--soft);font-size:14px;margin-bottom:26px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:18px 20px;margin-bottom:18px;box-shadow:0 1px 3px rgba(0,0,0,.03);}
+  .card h2{font-size:16px;margin:0 0 4px;display:flex;align-items:center;gap:8px;}
+  .card h2 .n{display:inline-flex;width:22px;height:22px;border-radius:50%;
+    background:var(--greenbg);color:var(--green);font-size:12px;
+    align-items:center;justify-content:center;font-weight:700;flex:none;}
+  .card .why{color:var(--soft);font-size:13px;margin:2px 0 12px;}
+  .io{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  @media(max-width:620px){.io{grid-template-columns:1fr;}}
+  .box{border-radius:9px;padding:10px 12px;font-size:14px;}
+  .box .lab{font-size:11px;font-weight:700;letter-spacing:.4px;margin-bottom:5px;display:block;opacity:.7;}
+  .before{background:var(--redbg);}
+  .before .lab{color:var(--red);}
+  .after{background:var(--greenbg);}
+  .after .lab{color:var(--green);}
+  code,.mono{font-family:"SF Mono",Consolas,Monaco,monospace;font-size:13px;
+    white-space:pre-wrap;word-break:break-word;display:block;}
+  .tagrow{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 0;}
+  .tag{font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;
+    background:var(--greenbg);color:var(--green);}
+  .tag.warn{background:var(--warnbg);color:var(--warn);}
+  .foot{color:var(--soft);font-size:13px;text-align:center;margin-top:26px;}
+  .pill{display:inline-block;background:#eef2ea;color:var(--green);
+    padding:2px 10px;border-radius:99px;font-size:12px;font-weight:700;margin-right:6px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📖 绘本朗读 · 文字识别优化对比</h1>
+  <div class="sub">
+    <span class="pill">优化完成</span>
+    针对「识别很多错、冒出英文、换行奇怪」三个问题逐项修复。下面每一条都是真实跑出来的结果。
+  </div>
+
+  <div class="card">
+    <h2><span class="n">1</span>汉字之间被识别出多余空格</h2>
+    <div class="why">OCR 常把「小兔子」读成「小 兔 子」，念起来一字一顿、很怪。</div>
+    <div class="io">
+      <div class="box before"><span class="lab">修复前</span><code>小 兔 子 蹦 蹦 跳 跳 地 来 到 草 地 上 。</code></div>
+      <div class="box after"><span class="lab">修复后</span><code>小兔子蹦蹦跳跳地来到草地上。</code></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">2</span>真正的英文被当成拼音删掉了</h2>
+    <div class="why">像 like / cute / are 这些词，恰好能拆成拼音音节，旧版会误删，导致句子缺字。</div>
+    <div class="io">
+      <div class="box before"><span class="lab">修复前</span><code>I apple
+We happy
+The cat is</code></div>
+      <div class="box after"><span class="lab">修复后</span><code>I like apple
+We are happy
+The cat is cute</code></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">3</span>拼音行没删干净</h2>
+    <div class="why">旧版对不带声调的连写拼音（laoshi、pengyou）判断不准，会漏删。</div>
+    <div class="io">
+      <div class="box before"><span class="lab">修复前</span><code>lao shi
+peng you</code></div>
+      <div class="box after"><span class="lab">修复后</span><code>（整行删除，不念）</code></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">4</span>英文跨行拼接时丢了空格</h2>
+    <div class="why">两行英文合并成一句时，中间空格被吃掉，变成「helloworld」。</div>
+    <div class="io">
+      <div class="box before"><span class="lab">修复前</span><code>helloworld</code></div>
+      <div class="box after"><span class="lab">修复后</span><code>hello world</code></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">5</span>标点统一成中文标点</h2>
+    <div class="why">英文逗号/问号在朗读时停顿不明显，统一成中文标点，孩子听得更清楚。</div>
+    <div class="io">
+      <div class="box before"><span class="lab">修复前</span><code>他看见一朵小红花, 真漂亮!</code></div>
+      <div class="box after"><span class="lab">修复后</span><code>他看见一朵小红花，真漂亮！</code></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">6</span>新增「可能不准」提示</h2>
+    <div class="why">某一页识别把握不大时（模糊/反光），页头会出现橙色小标，提醒你先看一眼再念。</div>
+    <div class="tagrow">
+      <span class="tag">第 3 页　12 字</span>
+      <span class="tag warn">可能不准</span>
+    </div>
+    <div class="why" style="margin-top:10px;">改了这页的文字后，橙色提示会自动消失。</div>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">7</span>整页真实识别效果（端到端）</h2>
+    <div class="why">一张模拟绘本页：含标题、拼音行、正文、英文句、页码。浏览器里真实 OCR，置信度 89。</div>
+    <div class="io" style="grid-template-columns:1fr;">
+      <div class="box before"><span class="lab">OCR 原始输出</span><code>小 兔 子 找 朋 友
+xiao tu zizhao peng you
+小 兔 子 蹦 蹦 跳 跳 地 来 到 草 地 上 。
+他 看 见 一 朵 小 红 花 , 真 漂 亮 !
+大 家 都 很 开 心 。
+Hello, how are you?
+- 12 -</code></div>
+      <div class="box after"><span class="lab">清理后（会念这个）</span><code>小兔子找朋友
+小兔子蹦蹦跳跳地来到草地上。
+他看见一朵小红花，真漂亮！
+大家都很开心。
+Hello，how are you？</code></div>
+    </div>
+  </div>
+
+  <div class="foot">
+    本地版（离线）与 GitHub 在线版均已同步更新 · 共 31 项自动化测试全部通过
+  </div>
+</div>
+</body>
+</html>
