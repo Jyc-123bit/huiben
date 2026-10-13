@@ -191,6 +191,36 @@
   }
   .voice-hint.warn{background:#fff8f2;border-color:#f5dcc8;color:#b06a2e;}
 
+  /* 声音选择 */
+  .voice-row{display:flex;align-items:center;gap:10px;}
+  .voice-label{font-size:13.5px;color:var(--ink-soft);flex:none;}
+  .voice-sel{
+    flex:1;min-width:0;font-family:inherit;font-size:13.5px;color:var(--ink);
+    padding:10px 11px;border-radius:11px;border:1.5px solid var(--line);
+    background:#fffdfa;outline:none;cursor:pointer;
+    -webkit-appearance:none;appearance:none;
+    background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23a9946f' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;
+  }
+  .voice-sel:focus{border-color:var(--accent);}
+  .voice-sel optgroup{font-weight:700;color:var(--ink-soft);}
+
+  /* Edge 提示 */
+  .edge-tip{
+    margin-top:12px;border:1px solid #e8e2f0;background:#faf8fd;border-radius:11px;
+    padding:9px 12px;font-size:12.5px;
+  }
+  .edge-tip summary{
+    cursor:pointer;color:#6b5b95;font-weight:700;list-style:none;
+    outline:none;user-select:none;
+  }
+  .edge-tip summary::-webkit-details-marker{display:none;}
+  .edge-tip-body{padding-top:9px;line-height:1.75;color:var(--ink-soft);}
+  .edge-tip-body p{margin:0 0 8px;}
+  .edge-tip-body p:last-child{margin-bottom:0;}
+  .edge-tip-body b{color:#5a4a85;}
+  .edge-tip-body .muted{color:#9a9285;font-size:12px;}
+
   /* 底部播放条 */
   .player{
     position:fixed;left:0;right:0;bottom:0;z-index:50;
@@ -281,7 +311,9 @@
     <h2><span class="step-no">1</span> 上传绘本照片</h2>
     <div class="env-warn" id="envWarn">
       <b>⚠️ 打开方式不对，识别会失败</b><br>
-      网络连接似乎有问题。识别引擎需要联网加载一次（约 20MB，之后浏览器会缓存，第二次就快了）。<br>请检查网络后刷新页面。
+      你目前是直接双击打开的网页。浏览器出于安全限制，这样打开时无法读取识别所需的文件。<br>
+      <b>正确做法：</b>回到文件夹，双击 <b>「启动-双击我.bat」</b>（Mac 双击 <b>「启动-双击我.command」</b>），
+      它会自动打开正确的页面。
     </div>
 
     <!-- 手机端按钮 -->
@@ -326,12 +358,31 @@
   <!-- 3 语速 -->
   <div class="card">
     <h2><span class="step-no">3</span> 朗读设置</h2>
-    <div class="speed-wrap">
+
+    <div class="voice-row">
+      <span class="voice-label">声音</span>
+      <select id="voiceSel" class="voice-sel">
+        <option value="">正在读取设备语音…</option>
+      </select>
+    </div>
+    <button class="btn btn-ghost btn-sm" id="btnPreview" style="width:100%;margin-top:8px;">🔊 试听一下</button>
+
+    <div class="speed-wrap" style="margin-top:14px;">
       <span style="font-size:13.5px;color:var(--ink-soft);">语速</span>
       <input type="range" id="speed" min="0.5" max="1.2" step="0.05" value="0.75">
       <span class="speed-val" id="speedVal">慢速 0.75×</span>
     </div>
     <div class="speed-tips">数值越小念得越慢。0.7~0.8 适合一年级小朋友跟着读。</div>
+
+    <details class="edge-tip">
+      <summary>💡 觉得声音还是不够自然？点这里</summary>
+      <div class="edge-tip-body">
+        <p><b>最自然的声音来自 Edge 浏览器</b>，它内置了微软的真人级中文语音（晓晓、晓伊、云希等），比系统默认语音自然得多。</p>
+        <p><b>用法：</b>把本页在 <b>Edge 浏览器</b>里打开，然后在「声音」下拉里选带 <b>Microsoft</b> 字样的中文语音即可。</p>
+        <p class="muted">如果下拉里没有 Microsoft 语音，可在下拉里选其他中文语音试听，挑一个顺耳的。</p>
+      </div>
+    </details>
+
     <div class="voice-hint" id="voiceHint">⏳ 正在读取设备的语音…</div>
   </div>
 </div>
@@ -523,18 +574,40 @@
   function isNoiseLine(line){
     var t = line.trim();
     if(!t) return true;
+
+    // ① 纯页码：12、- 12 -、(12)、[12]、·12·、12. 等
+    if(/^[-–—·\.\(\)\[\]（）【】\s]*\d{1,4}[-–—·\.\(\)\[\]（）【】\s]*$/.test(t)) return true;
+
+    // ② "第3页" "第 3 页" "P3" "P.3" "Page 3"
+    if(/^(第\s*\d+\s*页|page\s*\d+|p\.?\s*\d+)$/i.test(t)) return true;
+
+    // ③ 页码 + 书名混排的常见形式："12 小兔子" 之类不处理（怕误伤正文）
+    //    但 "小兔子 12"（结尾孤立数字）去掉数字
+    // —— 交给 cleanLine 处理尾部数字
+
+    // ④ "第X页 共Y页"
+    if(/^第\s*\d+\s*页\s*[\/共]?\s*第?\s*\d*\s*页?$/.test(t)) return true;
+
     // 没有任何汉字 / 有效字符（纯符号、纯空白）
     if(!/[\u4e00-\u9fff\u3400-\u4dbf0-9A-Za-z]/.test(t)) return true;
     return false;
   }
 
+  // 去掉行尾孤立的页码数字（"小兔子 12" → "小兔子"）
+  function stripTrailingPageNo(s){
+    // 行尾是 1~4 位数字，且数字前有中文标点或汉字
+    return s.replace(/([\u4e00-\u9fff\u3400-\u4dbf，。！？、；：“”‘’《》—…])\s*[-–—·\s]*\d{1,4}\s*$/, '$1');
+  }
+
   function cleanText(raw){
-    // 保留全部文字（含标题、页码、重复内容），只去除拼音
+    // 保留全部文字（含标题），只去除拼音和页码
     var lines = raw.replace(/\r/g, '').split('\n');
     var kept = [];
     for(var i = 0; i < lines.length; i++){
       var c = cleanLine(lines[i]);
       if(isNoiseLine(c)) continue;
+      c = stripTrailingPageNo(c);
+      if(!c || isNoiseLine(c)) continue;
       kept.push(c);
     }
     // 用换行连接，让标题、正文各自成句，朗读时自然停顿
@@ -715,10 +788,45 @@
   });
   speedLabel(speedSlider.value);
 
+  /* ============ 语音选择 ============ */
+  $('voiceSel').addEventListener('change', function(){
+    applySelectedVoice();
+    updateVoiceHint();
+    toast('已切换声音，点「试听一下」听听看');
+    // 正在播放就用新声音重念当前句
+    if(speaking && !paused) restartCurrentAtNewSpeed();
+  });
+
+  $('btnPreview').addEventListener('click', function(){
+    if(!synth){ toast('当前浏览器不支持语音朗读'); return; }
+    unlockSpeech();
+    try{ synth.cancel(); }catch(e){}
+    var wasPlaying = speaking;
+    speaking = false; paused = false;
+    clearTimeout(gapTimer); clearTimeout(watchdog);
+
+    var demo = '小兔子蹦蹦跳跳地来到草地上，他看见一朵小红花，真漂亮！';
+    var u = new SpeechSynthesisUtterance(demo);
+    u.lang = 'zh-CN';
+    if(zhVoice) u.voice = zhVoice;
+    u.rate = parseFloat(speedSlider.value);
+    u.pitch = 1.0;
+    u.onstart = function(){ setNow('试听：' + demo, true); };
+    u.onend = function(){
+      setNow(wasPlaying ? '（已暂停，点「继续」接着念）' : '试听结束，这个声音可以吗？', false);
+      $('btnPlay').textContent = '▶ 开始朗读';
+      $('btnPlay').classList.remove('pausing');
+    };
+    try{ synth.speak(u); }catch(e){ toast('试听失败，换个声音试试'); }
+  });
+
   /* ============ 朗读引擎 ============ */
   var synth = window.speechSynthesis;
   var voices = [];
   var zhVoice = null;
+  var lastUtter = null;
+  var gapTimer = null;
+  var watchdog = null;
   var speaking = false;
   var paused = false;
   var curSeg = -1;        // 当前段落序号
@@ -752,11 +860,95 @@
   function loadVoices(){
     if(!synth) return;
     voices = synth.getVoices() || [];
-    zhVoice = voices.find(function(v){ return /^zh[-_]?(CN|Hans|SG)/i.test(v.lang); }) ||
-              voices.find(function(v){ return /^zh/i.test(v.lang); }) ||
-              null;
+    buildVoiceList();
     // 有语音了，更新提示
     if(voices.length && !speaking) updateVoiceHint();
+  }
+
+  // 语音自然度打分：分数越高越像真人
+  function voiceScore(v){
+    var n = (v.name || '').toLowerCase();
+    var s = 0;
+    // Edge / Windows 的自然语音（最像真人）
+    if(/natural|neural/.test(n)) s += 100;
+    if(/xiaoxiao|xiaoyi|yunxi|yunxia|yunyang|xiaobei|xiaoni|晓晓|晓伊|云希|云夏/.test(n)) s += 90;
+    // 微软系
+    if(/microsoft/.test(n)) s += 50;
+    // 苹果的高质量语音
+    if(/siri|tingting|meijia|sinji|li-mu|yu-shu/.test(n)) s += 40;
+    // 本地基础语音
+    if(/google/.test(n)) s += 25;
+    // 中文（简体）优先
+    if(/^zh[-_]?(cn|hans)/i.test(v.lang)) s += 30;
+    else if(/^zh/i.test(v.lang)) s += 10;
+    // 明显是机械老语音的减分
+    if(/eSpeak|espeak|compact|eloquence/i.test(n)) s -= 60;
+    return s;
+  }
+
+  function buildVoiceList(){
+    var sel = $('voiceSel');
+    if(!sel) return;
+    var zh = voices.filter(function(v){ return /^zh/i.test(v.lang); });
+    if(!zh.length){
+      sel.innerHTML = '<option value="">（本机没有中文语音）</option>';
+      return;
+    }
+    // 按自然度排序
+    zh.sort(function(a, b){ return voiceScore(b) - voiceScore(a); });
+
+    var prev = sel.value || (zhVoice ? zhVoice.name + '|' + zhVoice.lang : '');
+    var html = '';
+    var recommended = zh.filter(function(v){ return voiceScore(v) >= 100; });
+    var others = zh.filter(function(v){ return voiceScore(v) < 100; });
+
+    if(recommended.length){
+      html += '<optgroup label="★ 推荐（最像真人）">';
+      recommended.forEach(function(v){
+        html += '<option value="' + esc(v.name + '|' + v.lang) + '">' +
+                esc(v.name) + ' — ' + esc(v.lang) + '</option>';
+      });
+      html += '</optgroup>';
+    }
+    if(others.length){
+      html += '<optgroup label="其他中文语音">';
+      others.forEach(function(v){
+        html += '<option value="' + esc(v.name + '|' + v.lang) + '">' +
+                esc(v.name) + ' — ' + esc(v.lang) + '</option>';
+      });
+      html += '</optgroup>';
+    }
+    sel.innerHTML = html;
+
+    // 恢复之前的选择，否则用最佳的
+    var restored = false;
+    if(prev){
+      for(var i = 0; i < sel.options.length; i++){
+        if(sel.options[i].value === prev){ sel.selectedIndex = i; restored = true; break; }
+      }
+    }
+    if(!restored && zh.length){
+      sel.selectedIndex = 0;
+      zhVoice = zh[0];
+    }else{
+      applySelectedVoice();
+    }
+  }
+
+  function esc(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+
+  function applySelectedVoice(){
+    var sel = $('voiceSel');
+    if(!sel || !sel.value) return;
+    var parts = sel.value.split('|');
+    var name = parts[0], lang = parts[1];
+    var found = voices.find(function(v){ return v.name === name && v.lang === lang; }) ||
+                voices.find(function(v){ return v.name === name; });
+    if(found) zhVoice = found;
   }
 
   function updateVoiceHint(){
@@ -908,10 +1100,6 @@
       advance();
     }
   }
-
-  var lastUtter = null;
-  var gapTimer = null;
-  var watchdog = null;
 
   function doPause(){
     if(!speaking || paused) return;
