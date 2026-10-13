@@ -157,6 +157,9 @@
     font-size:11px;font-weight:700;padding:3px 8px;border-radius:99px;
     background:#eaf7ef;color:var(--green);
   }
+  .page-head .tag-warn{
+    background:#fdf0e6;color:#c2570d;
+  }
   textarea{
     width:100%;border:none;outline:none;resize:vertical;
     font-family:inherit;font-size:16.5px;line-height:1.85;color:var(--ink);
@@ -522,39 +525,102 @@
 
   /* ============ 拼音清洗 ============ */
   /*
-    去掉：带声调的拼音字母、注音符号、纯拼音行、括号里的拼音
-    保留：汉字、中文标点、数字、英文字母单词（如 "OK" 很难判断，一律尽量保守）
+    去掉：带声调的拼音、注音符号、纯拼音行、括号里的拼音、连写拼音
+    保留：汉字、中文标点、数字、真正的英文单词
   */
   var PINYIN_CHARS = /[āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜüĀÁǍÀĒÉĚÈĪÍǏÌŌÓǑÒŪÚǓÙǕǗǙǛÜ]/;
   var ZHUYIN = /[\u3105-\u3129\u31A0-\u31BF]/;
 
+  // 合法拼音音节表（含无声调写法）—— 用于识别连写拼音
+  var PINYIN_SYLLABLES = ('a ai an ang ao ba bai ban bang bao bei ben beng bi bian biao bie bin bing bo bu ca cai can cang cao ce cen ceng cha chai chan chang chao che chen cheng chi chong chou chu chua chuai chuan chuang chui chun chuo ci cong cou cu cuan cui cun cuo da dai dan dang dao de dei den deng di dian diao die ding diu dong dou du duan dui dun duo e ei en eng er fa fan fang fei fen feng fo fou fu ga gai gan gang gao ge gei gen geng gong gou gu gua guai guan guang gui gun guo ha hai han hang hao he hei hen heng hm hng hong hou hu hua huai huan huang hui hun huo ji jia jian jiang jiao jie jin jing jiong jiu ju juan jue jun ka kai kan kang kao ke ken keng kong kou ku kua kuai kuan kuang kui kun kuo la lai lan lang lao le lei len leng li lia lian liang liao lie lin ling liu lo long lou lu luan lun luo lü lüe m ma mai man mang mao me mei men meng mi mian miao mie min ming miu mo mou mu n na nai nan nang nao ne nei nen neng ng ni nian niang niao nie nin ning niu nong nou nu nuan nun nuo nü nüe o ou pa pai pan pang pao pei pen peng pi pian piao pie pin ping po pou pu qi qia qian qiang qiao qie qin qing qiong qiu qu quan que qun ran rang rao re ren reng ri rong rou ru rua ruan rui run ruo sa sai san sang sao se sen seng sha shai shan shang shao she shei shen sheng shi shou shu shua shuai shuan shuang shui shun shuo si song sou su suan sui sun suo ta tai tan tang tao te teng ti tian tiao tie ting tong tou tu tuan tui tun tuo wa wai wan wang wei wen weng wo wu xi xia xian xiang xiao xie xin xing xiong xiu xu xuan xue xun ya yan yang yao ye yi yin ying yo yong you yu yuan yue yun za zai zan zang zao ze zei zen zeng zha zhai zhan zhang zhao zhe zhei zhen zheng zhi zhong zhou zhu zhua zhuai zhuan zhuang zhui zhun zhuo zi zong zou zu zuan zui zun zuo').split(' ');
+
+  var SYL_SET = {};
+  PINYIN_SYLLABLES.forEach(function(s){ SYL_SET[s] = true; });
+
+  // 能否把一串字母切分成「全部合法的拼音音节」
+  function isPinyinSequence(word){
+    var w = word.toLowerCase().replace(/[^a-zü]/g, '');
+    if(!w) return false;
+    if(w.length > 24) return false;
+
+    // 带声调的直接算拼音
+    if(PINYIN_CHARS.test(word)) return true;
+
+    // 尝试切分
+    function canSplit(s){
+      if(!s) return true;
+      var maxLen = Math.min(6, s.length);
+      // 从长到短尝试匹配音节（优先长音节，切分更准）
+      for(var len = maxLen; len >= 1; len--){
+        var head = s.substring(0, len);
+        if(SYL_SET[head] && canSplit(s.substring(len))) return true;
+      }
+      return false;
+    }
+
+    // 单字母音节极少（a/o/e），若整体能切分且不全是同一个字母，判为拼音
+    if(!canSplit(w)) return false;
+
+    // 避免把真正的英文单词误判：
+    // 常见英文短词保留（这些词由拼音音节拼成，但显然是英文）
+    var KEEP = /^(ok|no|yes|hi|hey|wow|oh|my|me|we|he|she|it|is|are|was|were|be|am|been|do|does|did|go|goes|so|up|us|at|in|on|of|to|the|and|but|not|can|all|our|her|him|his|its|out|off|too|you|your|yours|new|one|two|red|big|sun|fun|cat|dog|mum|mom|dad|for|see|look|love|good|nice|hello|abc|has|had|have|like|likes|liked|cute|cuter|this|that|these|those|here|there|where|what|when|who|why|how|come|came|home|name|game|time|life|five|nine|tree|free|three|white|black|blue|green|apple|apples|boy|girl|book|books|ball|toy|toys|food|milk|cake|rice|meat|fish|bird|bears|bear|deer|duck|sees|side|ride|nice|line|mine|fine|pine|wine|shine|smile|while|mile|pile|tile|file|style|type|mute|note|vote|code|mode|node|road|load|boat|coat|goat|soap|beat|seat|team|dream|cream|mean|clean|please|read|ready|head|bread|dead|eat|east|easy|busy|body|baby|happy|sunny|many|very|every|study|city|party|story|sorry|worry|carry|hurry|merry|berry|cherry|funny|runny|penny|money|honey|monkey|key|way|day|say|may|play|stay|away|today|always|maybe|lady|copy|pretty|empty|noisy|messy|silly|lucky|yummy|tummy|mommy|daddy|candy|handy|kitty|puppy|bunny|winner|dinner|summer|winter|water|paper|tiger|river|never|under|over|after|other|mother|father|brother|sister|teacher|doctor|farmer|flower|power|tower|towel|lower|higher|super|letter|better|butter|number|finger|singer|dancer|answer|circle|purple|people|little|middle|table|candle|handle|noodle|needle|puzzle|whistle)$/;
+    if(KEEP.test(w)) return false;
+
+    // 含常见英文构词特征 → 判为英文，保留
+    if(/(ing|tion|ous|ful|less|ness|ment|ight|ould|augh|ough|sion|ture|cious|tious)$/.test(w)) return false;
+    // 只保留「拼音里绝不可能出现」的辅音簇（避免误伤 shi/chi/zhi 等合法拼音音节）
+    if(/(bl|br|cl|cr|dr|fl|fr|gl|gr|pl|pr|scr|sk|sl|sm|sn|sw|tr|tw|ck|ff|ll|mm|nn|pp|rr|ss|tt|zz|mb|mp|nk|ld|lt|rd|rt|rk|ph|gh|wr|kn|wh|th)/.test(w)) return false;
+
+    // 含 ü、或以 y/w 开头且能完整切分 → 多为拼音
+    // 若字母组合很"英文"（含常见英文后缀 ing/ed/ly/er/oo 等 且不是拼音切分）已在上面排除
+    return true;
+  }
+
   function hasHan(s){ return /[\u4e00-\u9fff\u3400-\u4dbf]/.test(s); }
 
-  // 判断一个 token 是否像拼音（无声调也需要靠上下文，这里只处理明显情况）
+  // 判断一个 token 是否像拼音
   function looksLikePinyin(word){
-    if(PINYIN_CHARS.test(word)) return true;
+    // 孤立单字母：a / A（英文冠词，保留）；其余单个小写字母（o e 等）当作噪声丢弃
+    if(/^[AaIi]$/.test(word)) return false;
+    if(/^[b-hj-zü]$/i.test(word)) return /^[A-Z]$/.test(word) ? false : true;
+
     if(ZHUYIN.test(word)) return true;
-    // 纯拉丁字母且全是小写、长度 <= 6，且不是常见英文词 —— 一年级绘本里正文基本是汉字
-    if(/^[a-zü]+$/.test(word) && word.length <= 6){
-      // 排除几个绘本里常出现的英文
-      if(/^(ok|no|yes|hi|wow|oh|my)$/.test(word)) return false;
-      return true;
+    if(PINYIN_CHARS.test(word)) return true;
+    // 纯拉丁字母（无声调）→ 用音节切分判断
+    if(/^[a-zü]+$/.test(word)){
+      return isPinyinSequence(word);
+    }
+    // 大小写混合（如 XiaoTuZi）→ 去掉大写再判断
+    if(/^[A-Za-zü]+$/.test(word) && /[A-Z]/.test(word) && /[a-z]/.test(word)){
+      return isPinyinSequence(word);
     }
     return false;
   }
 
   function cleanLine(line){
     var s = line;
-    // 去掉括号内的拼音：[xiǎo] （xiǎo） 等
+
+    // ① 去掉括号内的拼音：[xiǎo] （xiǎo） 等
     s = s.replace(/[\[\(（【]\s*[a-zāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜü\s'’·\-]+\s*[\]\)）】]/gi, '');
-    // 去掉孤立的声调符号 / 分隔符
+    // ② 去掉孤立的声调符号 / 分隔符
     s = s.replace(/[ˇˊˋ˙]/g, '');
+
+    // ③ 先判断整行是不是「拼音行」（整行由拼音音节 + 空格组成）
+    var noSpace = s.replace(/\s/g, '');
+    if(/^[a-zA-ZüĀ-ǜ\s]+$/.test(s) && noSpace.length > 1 && isPinyinSequence(noSpace)){
+      return '';   // 整行拼音 → 整行丢弃
+    }
+
     var parts = s.split(/(\s+)/);
     var out = [];
     for(var i = 0; i < parts.length; i++){
       var p = parts[i];
       if(!p) continue;
-      if(/^\s+$/.test(p)){ continue; }   // 空格单独处理，先跳过
+      if(/^\s+$/.test(p)){
+        // 空格：先留着，后面统一决定要不要保留（英文单词间保留）
+        out.push(' ');
+        continue;
+      }
       // 去掉两端的非文字、非标点字符，保留汉字 / 数字 / 字母 / 中英文标点
       var core = p.replace(/^[^\u4e00-\u9fff\u3400-\u4dbfA-Za-z0-9üāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ，。！？、；：“”‘’《》—…（）,.!?;:'"]+|[^\u4e00-\u9fff\u3400-\u4dbfA-Za-z0-9üāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ，。！？、；：“”‘’《》—…（）,.!?;:'"]+$/g, '');
       if(!core) continue;
@@ -565,10 +631,49 @@
     // 半角标点统一转中文标点，保证朗读有停顿
     s = s.replace(/,/g, '，').replace(/!/g, '！').replace(/\?/g, '？')
          .replace(/;/g, '；').replace(/:(?![\/])/g, '：');
-    // 汉字/标点之间的多余空格去掉，但保留英文单词间的空格
-    s = s.replace(/([\u4e00-\u9fff\u3400-\u4dbf，。！？、；：“”‘’《》—…（）])\s+(?=[\u4e00-\u9fff\u3400-\u4dbf，。！？、；：“”‘’《》—…（）])/g, '$1');
-    s = s.replace(/\s+/g, '');
-    return s.trim();
+    // 空格处理：汉字/标点之间的空格去掉；英文单词之间的空格保留（避免 helloyou）
+    // ① 先去掉「汉字/中文标点」两侧的空格
+    s = s.replace(/([\u4e00-\u9fff\u3400-\u4dbf，。！？、；：“”‘’《》—…（）])\s+/g, '$1');
+    s = s.replace(/\s+([\u4e00-\u9fff\u3400-\u4dbf，。！？、；：“”‘’《》—…（）])/g, '$1');
+    // ② 剩下的空格：只保留「字母 ↔ 字母」之间的（英文单词间），其余压掉
+    s = s.replace(/\s+/g, function(sp, offset, whole){
+      var prev = whole.charAt(offset - 1);
+      var next = whole.charAt(offset + sp.length);
+      if(/[A-Za-z]/.test(prev) && /[A-Za-z]/.test(next)) return ' ';
+      return '';
+    });
+    s = s.replace(/ {2,}/g, ' ').trim();
+    return s;
+  }
+
+  // 在汉字后面残留的孤立小写拼音（如 "朋友you"）—— 清掉
+  function stripTrailingPinyinBeforeHan(s){
+    // 汉字 + 1~4个小写字母（拼音残留）→ 去掉字母
+    return s.replace(/([\u4e00-\u9fff])([a-zü]{1,4})(?=$|[\u4e00-\u9fff，。！？、；：])/g, function(m, han, py){
+      return SYL_SET[py] ? han : m;
+    });
+  }
+
+  // 一行里出现「标题 + 正文粘连」→ 在重复处切开
+  // 例："小兔子找朋友小兔子蹦蹦跳跳地来到草地上。" → ["小兔子找朋友", "小兔子蹦蹦跳跳地来到草地上。"]
+  function splitGluedTitle(s){
+    var res = [];
+    // 找 2~10 字的开头片段，在后面的位置再次出现
+    for(var len = 2; len <= 10; len++){
+      if(len >= s.length) break;
+      var head = s.substring(0, len);
+      // 只处理"看起来像标题"的片段（不含标点）
+      if(/[，。！？、；：]/.test(head)) break;
+      var idx = s.indexOf(head, len);
+      if(idx > 0 && idx < s.length - 2){
+        res.push(s.substring(0, idx));
+        var rest = s.substring(idx);
+        // 递归处理剩余部分
+        return res.concat(splitGluedTitle(rest));
+      }
+    }
+    if(s) res.push(s);
+    return res;
   }
 
   function isNoiseLine(line){
@@ -599,19 +704,100 @@
     return s.replace(/([\u4e00-\u9fff\u3400-\u4dbf，。！？、；：“”‘’《》—…])\s*[-–—·\s]*\d{1,4}\s*$/, '$1');
   }
 
+  // 判断这一行是不是「完整句子」（以句末标点结尾）
+  function isSentenceEnd(s){
+    return /[。！？!?…]$/.test(s.trim());
+  }
+  // 判断这一行是不是「看起来像标题」：短、且没有句末标点
+  function looksLikeTitle(s){
+    var t = s.trim();
+    return t.length <= 14 && !/[。，！？、；：,;]$/.test(t);
+  }
+
   function cleanText(raw){
-    // 保留全部文字（含标题），只去除拼音和页码
     var lines = raw.replace(/\r/g, '').split('\n');
-    var kept = [];
+    var cleaned = [];
     for(var i = 0; i < lines.length; i++){
       var c = cleanLine(lines[i]);
       if(isNoiseLine(c)) continue;
       c = stripTrailingPageNo(c);
+      c = stripTrailingPinyinBeforeHan(c);
       if(!c || isNoiseLine(c)) continue;
-      kept.push(c);
+      // 标题与正文粘连 → 拆开
+      var pieces = splitGluedTitle(c);
+      for(var pi = 0; pi < pieces.length; pi++){
+        if(pieces[pi]) cleaned.push(pieces[pi]);
+      }
     }
-    // 用换行连接，让标题、正文各自成句，朗读时自然停顿
-    return kept.join('\n');
+    if(!cleaned.length) return '';
+
+    // ===== 去掉「前缀重复」：如 ["小兔子", "小兔子蹦蹦跳跳..."] → 去掉短的 =====
+    var dedup = [];
+    for(var a = 0; a < cleaned.length; a++){
+      var cur = cleaned[a];
+      var isPrefixDup = false;
+      // 与后面的行比较
+      for(var bk = a + 1; bk < Math.min(a + 3, cleaned.length); bk++){
+        var nxt = cleaned[bk];
+        if(nxt.length > cur.length && nxt.indexOf(cur) === 0){
+          isPrefixDup = true;   // cur 是下一行的开头 → 重复，丢掉
+          break;
+        }
+      }
+      if(!isPrefixDup) dedup.push(cur);
+    }
+    // 去掉完全相同的相邻行
+    var uniq = [];
+    for(var u = 0; u < dedup.length; u++){
+      if(u > 0 && dedup[u] === dedup[u-1]) continue;
+      uniq.push(dedup[u]);
+    }
+
+    // ===== 智能合并碎行 =====
+    var merged = [];
+    var buf = '';
+    for(var j = 0; j < uniq.length; j++){
+      var line = uniq[j];
+
+      // 短行且没有句末标点，且下一行较长 → 当作标题独立成段
+      if(!buf && !isSentenceEnd(line) && line.length <= 14){
+        var nextEnds = (j + 1 < uniq.length) && isSentenceEnd(uniq[j + 1]);
+        var nextLong = (j + 1 < uniq.length) && uniq[j + 1].length >= 14;
+        var isLast = (j === uniq.length - 1);
+        // 关键：如果这一行和下一行开头重复，说明是标题+正文的粘连，切出来
+        var nextStartsSame = (j + 1 < uniq.length) && uniq[j + 1].indexOf(line) === 0;
+        if(nextEnds || nextLong || isLast || nextStartsSame){
+          merged.push(line);
+          continue;
+        }
+      }
+
+      // 拼接时：若上一段结尾与这一段开头都是英文字母，中间补一个空格
+      // 例："hello\nworld" → "hello world"；"小兔子\n蹦跳" → "小兔子蹦跳"
+      if(buf && /[A-Za-z]$/.test(buf) && /^[A-Za-z]/.test(line)){
+        buf += ' ' + line;
+      }else{
+        buf += line;
+      }
+
+      if(isSentenceEnd(buf)){
+        merged.push(buf);
+        buf = '';
+      }else if(buf.length >= 45){
+        merged.push(buf);
+        buf = '';
+      }
+    }
+    if(buf) merged.push(buf);
+
+    // 最后一次去重
+    var out = [];
+    for(var k = 0; k < merged.length; k++){
+      if(k > 0 && merged[k] === merged[k-1]) continue;
+      out.push(merged[k]);
+    }
+
+    return out.join('\n');
   }
 
   /* ============ OCR ============ */
@@ -673,8 +859,10 @@
           }
         });
 
-        var ret = await worker.recognize(images[idx].url);
+        var ret = await worker.recognize(await preprocessImage(images[idx].url));
+        var conf = (ret && ret.data && typeof ret.data.confidence === 'number') ? ret.data.confidence : null;
         images[idx].text = cleanText((ret && ret.data && ret.data.text) || '');
+        images[idx].confidence = conf;
         renderPages();
       }
 
@@ -708,6 +896,76 @@
     return p;                                        // http 下也是相对路径即可
   }
 
+  /* ============ 图像预处理（提升识别准确率） ============ */
+  /*
+    绘本照片常见问题：字小、偏灰、有阴影。
+    预处理：放大到合适尺寸 + 灰度化 + 对比度增强 + 轻微锐化
+  */
+  function preprocessImage(url){
+    return new Promise(function(resolve){
+      var img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = function(){
+        try{
+          var w = img.naturalWidth, h = img.naturalHeight;
+          // 目标：长边控制在 1000~2000 之间（太小看不清，太大反而慢且易噪）
+          var MAX = 2000, MIN = 1000;
+          var longSide = Math.max(w, h);
+          var scale = 1;
+          if(longSide > MAX) scale = MAX / longSide;
+          else if(longSide < MIN) scale = Math.min(2, MIN / longSide);
+
+          var cw = Math.max(1, Math.round(w * scale));
+          var ch = Math.max(1, Math.round(h * scale));
+
+          var c = document.createElement('canvas');
+          c.width = cw; c.height = ch;
+          var ctx = c.getContext('2d');
+
+          // 高质量缩放
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, 0, 0, cw, ch);
+
+          // 灰度 + 自适应对比度增强（温和一些，避免糊掉细笔画）
+          var data = ctx.getImageData(0, 0, cw, ch);
+          var px = data.data;
+
+          // 先算平均亮度，据此决定对比度强度
+          var sum = 0, n = 0;
+          for(var k = 0; k < px.length; k += 16){
+            sum += (px[k]*0.299 + px[k+1]*0.587 + px[k+2]*0.114);
+            n++;
+          }
+          var avg = n ? sum / n : 128;
+          // 图片偏暗时多提亮，偏亮时少动，对比度温和提升
+          var contrast = 1.18;
+          var intercept = 128 * (1 - contrast);
+          var bright = avg < 110 ? 20 : (avg > 190 ? -8 : 6);
+
+          for(var i = 0; i < px.length; i += 4){
+            // 灰度（加权平均）
+            var g = px[i] * 0.299 + px[i+1] * 0.587 + px[i+2] * 0.114;
+            // 对比度拉伸 + 亮度补偿
+            g = g * contrast + intercept + bright;
+            g = g < 0 ? 0 : (g > 255 ? 255 : g);
+            px[i] = px[i+1] = px[i+2] = g;
+          }
+          ctx.putImageData(data, 0, 0);
+
+          c.toBlob(function(blob){
+            resolve(blob ? URL.createObjectURL(blob) : url);
+          }, 'image/png');
+        }catch(e){
+          console.warn('预处理失败，用原图:', e);
+          resolve(url);
+        }
+      };
+      img.onerror = function(){ resolve(url); };
+      img.src = url;
+    });
+  }
+
   /* ============ 渲染文字 ============ */
   function renderPages(){
     var box = $('pages');
@@ -715,12 +973,16 @@
 
     box.innerHTML = images.map(function(im, i){
       var n = im.text.replace(/\s/g, '').length;
+      var lowConf = (typeof im.confidence === 'number' && im.confidence > 0 && im.confidence < 70);
+      var tagCls = lowConf ? 'tag tag-warn' : 'tag';
+      var tagTxt = n ? (n + ' 字') : '待识别';
       return '<div class="page">' +
         '<div class="page-head">' +
           '<img class="thumb-mini" src="' + im.url + '" alt="">' +
           '<span>第 ' + (i + 1) + ' 页</span>' +
           '<span class="spacer"></span>' +
-          '<span class="tag">' + (n ? n + ' 字' : '待识别') + '</span>' +
+          (lowConf ? '<span class="tag tag-warn">可能不准</span>' : '') +
+          '<span class="' + tagCls + '">' + tagTxt + '</span>' +
         '</div>' +
         '<textarea data-id="' + im.id + '" spellcheck="false" ' +
           'placeholder="这一页的文字（识别后会自动填在这里）">' +
@@ -749,7 +1011,13 @@
     var im = images.find(function(x){ return x.id === id; });
     if(!im) return;
     im.text = e.target.value;
-    var tag = e.target.closest('.page').querySelector('.tag');
+    var pageEl = e.target.closest('.page');
+    // 用户手动改过之后，就不再提示“可能不准”
+    im.confidence = null;
+    var warnEl = pageEl.querySelector('.tag-warn');
+    if(warnEl) warnEl.remove();
+    var tags = pageEl.querySelectorAll('.tag');
+    var tag = tags[tags.length - 1];
     if(tag){
       var n = im.text.replace(/\s/g, '').length;
       tag.textContent = n ? n + ' 字' : '空白';
@@ -1151,6 +1419,17 @@
   }
 
   // 离开页面 / 切到后台时停掉，避免回来后状态错乱
+  // 调试钩子（便于自动化测试，不影响正常使用）
+  window.__hb = {
+    cleanText: cleanText,
+    cleanLine: cleanLine,
+    looksLikePinyin: looksLikePinyin,
+    isNoiseLine: isNoiseLine,
+    buildSegments: buildSegments,
+    getSegments: function(){ return segments.slice(); },
+    setImages: function(arr){ images = arr; }
+  };
+
   window.addEventListener('beforeunload', function(){
     try{ synth && synth.cancel(); }catch(e){}
   });
